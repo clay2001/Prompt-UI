@@ -1,0 +1,3881 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Comfy UI Prompt Generator v12.5</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#4F46E5',
+                        secondary: '#10B981',
+                        accent: '#F59E0B',
+                        danger: '#EF4444',
+                        warning: '#F59E0B',
+                        info: '#3B82F6',
+                        light: '#F8FAFC',
+                        dark: '#1E293B',
+                        r18: '#db2777',
+                        newTag: '#8B5CF6'
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            min-height: 100vh;
+        }
+        
+        .main-title {
+            font-size: 28px !important;
+            font-weight: 700;
+            color: #1e293b;
+            text-align: center;
+            margin-bottom: 8px;
+            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+        
+        .subtitle {
+            font-size: 16px !important;
+            font-weight: 500;
+            color: #64748b;
+            text-align: center;
+            margin-bottom: 24px;
+            letter-spacing: 0.5px;
+        }
+        
+        .section-title {
+            font-size: 18px !important;
+            font-weight: 600;
+            color: #1e293b;
+            margin-bottom: 16px;
+            padding-bottom: 8px;
+            border-bottom: 2px solid #e2e8f0;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .app-card {
+            background: white;
+            border-radius: 16px;
+            padding: 24px;
+            margin-bottom: 20px;
+            box-shadow: 0 8px 30px rgba(0, 0, 0, 0.12);
+            border: 1px solid #e2e8f0;
+        }
+        
+        .tag-item {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white !important;
+            border: 2px solid transparent;
+            border-radius: 12px !important;
+            padding: 10px 20px !important;
+            padding-right: 40px !important;
+            margin: 4px !important;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            min-height: 60px;
+            min-width: 120px;
+            max-width: 280px;
+            display: inline-flex;
+            flex-direction: column;
+            justify-content: center;
+            text-align: left;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+            position: relative;
+            flex: 1;
+        }
+        
+        .tag-item:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3);
+            border-color: rgba(255, 255, 255, 0.9);
+        }
+        
+        .tag-text {
+            font-weight: 600;
+            text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+            letter-spacing: 0.3px;
+            font-size: 14px !important;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            width: 100%;
+            line-height: 1.4;
+            margin-bottom: 3px;
+        }
+        
+        .tag-name {
+            font-weight: 500;
+            text-shadow: 0 1px 1px rgba(0, 0, 0, 0.2);
+            font-size: 12px !important;
+            white-space: normal !important;
+            word-wrap: break-word;
+            width: 100%;
+            line-height: 1.3;
+        }
+        
+        .tag-actions {
+            position: absolute;
+            top: 6px;
+            right: 6px;
+            display: flex;
+            gap: 2px;
+            background: rgba(0, 0, 0, 0.5);
+            padding: 2px;
+            border-radius: 8px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            z-index: 10;
+            opacity: 0.7;
+        }
+        
+        .tag-item:hover .tag-actions {
+            opacity: 1;
+        }
+        
+        .tag-actions button {
+            width: 18px !important;
+            height: 18px !important;
+            font-size: 10px !important;
+            padding: 0 !important;
+            border-radius: 4px !important;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 18px;
+            min-height: 18px;
+            transition: all 0.2s ease;
+            opacity: 0.9;
+        }
+        
+        .tag-actions button:hover:not(:disabled) {
+            transform: scale(1.2);
+            box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
+            opacity: 1;
+        }
+        
+        .tag-actions .pin-btn {
+            background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%) !important;
+            color: white !important;
+        }
+        
+        .tag-actions .favorite-btn {
+            background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%) !important;
+            color: white !important;
+        }
+        
+        .tag-actions .edit-tag-btn {
+            background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%) !important;
+            color: white !important;
+        }
+        
+        .tag-actions .delete-tag-btn {
+            background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%) !important;
+            color: white !important;
+        }
+        
+        .tags-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            align-items: flex-start;
+            justify-content: flex-start;
+        }
+        
+        .btn {
+            transition: all 0.3s ease;
+            font-weight: 600;
+            border-radius: 8px !important;
+            padding: 6px 12px !important;
+            font-size: 13px !important;
+            min-height: 36px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 4px;
+            box-shadow: 0 3px 10px rgba(0, 0, 0, 0.1);
+            border: 2px solid transparent;
+        }
+        
+        .btn:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.15);
+        }
+        
+        .btn-primary {
+            background: linear-gradient(135deg, #4F46E5 0%, #7C3AED 100%) !important;
+            color: white !important;
+            border-color: rgba(255, 255, 255, 0.3);
+        }
+        
+        .btn-success {
+            background: linear-gradient(135deg, #10B981 0%, #059669 100%) !important;
+            color: white !important;
+            border-color: rgba(255, 255, 255, 0.3);
+        }
+        
+        .btn-danger {
+            background: linear-gradient(135deg, #EF4444 0%, #DC2626 100%) !important;
+            color: white !important;
+            border-color: rgba(255, 255, 255, 0.3);
+        }
+        
+        .btn-info {
+            background: linear-gradient(135deg, #3B82F6 0%, #2563EB 100%) !important;
+            color: white !important;
+            border-color: rgba(255, 255, 255, 0.3);
+        }
+        
+        .btn-warning {
+            background: linear-gradient(135deg, #F59E0B 0%, #D97706 100%) !important;
+            color: white !important;
+            border-color: rgba(255, 255, 255, 0.3);
+        }
+        
+        .tab-button {
+            transition: all 0.3s ease;
+            font-weight: 600;
+            padding: 8px 14px !important;
+            font-size: 14px !important;
+            min-height: 40px;
+            border-radius: 8px !important;
+            margin: 0 3px !important;
+            position: relative;
+            overflow: hidden;
+            border: 2px solid transparent;
+            white-space: nowrap;
+        }
+        
+        .tab-button.active {
+            background: linear-gradient(135deg, #4F46E5 0%, #7C3AED 100%) !important;
+            color: white !important;
+            box-shadow: 0 6px 20px rgba(79, 70, 229, 0.4);
+            border-color: rgba(255, 255, 255, 0.3);
+        }
+        
+        .tab-button:not(.active) {
+            background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%) !important;
+            color: #475569 !important;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08);
+        }
+        
+        .tab-button.r18-tab {
+            background: linear-gradient(135deg, #db2777 0%, #be185d 100%) !important;
+            color: white !important;
+        }
+        
+        .tab-button.r18-tab.active {
+            background: linear-gradient(135deg, #be185d 0%, #9d174d 100%) !important;
+            box-shadow: 0 6px 20px rgba(219, 39, 119, 0.4);
+        }
+        
+        .notification {
+            position: fixed;
+            top: 16px;
+            right: 16px;
+            z-index: 1000;
+            font-weight: 600;
+            padding: 10px 16px !important;
+            border-radius: 8px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+            font-size: 13px !important;
+            min-height: 40px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            border: 2px solid transparent;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.3s ease;
+        }
+        
+        .notification.show {
+            opacity: 1;
+            visibility: visible;
+        }
+        
+        .notification.success {
+            background: linear-gradient(135deg, #10B981 0%, #059669 100%);
+            color: white;
+            border-color: rgba(255, 255, 255, 0.3);
+        }
+        
+        .notification.warning {
+            background: linear-gradient(135deg, #F59E0B 0%, #D97706 100%);
+            color: white;
+            border-color: rgba(255, 255, 255, 0.3);
+        }
+        
+        .notification.info {
+            background: linear-gradient(135deg, #3B82F6 0%, #2563EB 100%);
+            color: white;
+            border-color: rgba(255, 255, 255, 0.3);
+        }
+        
+        .notification.r18 {
+            background: linear-gradient(135deg, #db2777 0%, #be185d 100%);
+            color: white;
+            border-color: rgba(255, 255, 255, 0.3);
+        }
+        
+        .group-add-button {
+            background: linear-gradient(135deg, #10B981 0%, #059669 100%) !important;
+            color: white !important;
+            border: 2px solid transparent !important;
+            border-radius: 12px !important;
+            padding: 8px 16px !important;
+            font-size: 14px !important;
+            font-weight: 600 !important;
+            cursor: pointer !important;
+            transition: all 0.3s ease !important;
+            margin: 4px !important;
+            display: inline-flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            gap: 6px !important;
+            min-height: 60px !important;
+            min-width: 120px !important;
+            box-shadow: 0 4px 15px rgba(16, 185, 129, 0.3) !important;
+        }
+        
+        .group-add-button:hover {
+            transform: translateY(-2px) !important;
+            box-shadow: 0 8px 25px rgba(16, 185, 129, 0.4) !important;
+            border-color: rgba(255, 255, 255, 0.3) !important;
+        }
+        
+        .preset-prompt-copy {
+            cursor: pointer;
+            transition: all 0.2s ease;
+            position: relative;
+        }
+        
+        .preset-prompt-copy:hover {
+            background-color: #f1f5f9;
+            border-color: #cbd5e1;
+        }
+        
+        .preset-prompt-copy::after {
+            content: '点击复制';
+            position: absolute;
+            top: -25px;
+            right: 5px;
+            background: #1e293b;
+            color: white;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 10px;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.2s ease;
+            white-space: nowrap;
+        }
+        
+        .preset-prompt-copy:hover::after {
+            opacity: 1;
+            visibility: visible;
+        }
+        
+        .title-actions {
+            display: flex;
+            gap: 8px;
+            margin-left: auto;
+        }
+        
+        .title-bar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 16px;
+        }
+        
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.3s ease;
+        }
+        
+        .modal-overlay.show {
+            opacity: 1;
+            visibility: visible;
+        }
+        
+        .modal {
+            background: white;
+            border-radius: 16px;
+            width: 90%;
+            max-width: 500px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.2);
+            border: 2px solid #e2e8f0;
+            max-height: 80vh;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .modal-content {
+            flex: 1;
+            overflow-y: auto;
+            padding: 0 16px;
+        }
+        
+        .modal-title {
+            font-size: 18px;
+            font-weight: 600;
+            padding: 16px;
+            border-bottom: 2px solid #e2e8f0;
+            color: #1e293b;
+        }
+        
+        .modal-body {
+            padding: 16px;
+        }
+        
+        .modal-footer {
+            padding: 16px;
+            border-top: 2px solid #e2e8f0;
+            display: flex;
+            justify-content: flex-end;
+            gap: 8px;
+        }
+        
+        .form-group {
+            margin-bottom: 16px;
+        }
+        
+        .form-label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #1e293b;
+        }
+        
+        .form-control {
+            width: 100%;
+            padding: 8px 12px;
+            border: 2px solid #e2e8f0;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: all 0.2s ease;
+        }
+        
+        .form-control:focus {
+            outline: none;
+            border-color: #4F46E5;
+            box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
+        }
+        
+        .storage-info-modal .modal {
+            max-width: 600px;
+        }
+        
+        .storage-info-content {
+            line-height: 1.6;
+        }
+        
+        .storage-info-content h4 {
+            margin-top: 16px;
+            margin-bottom: 8px;
+            color: #1e293b;
+            font-weight: 600;
+        }
+        
+        .storage-info-content p {
+            margin-bottom: 8px;
+            color: #475569;
+        }
+        
+        .storage-info-content ul {
+            margin-bottom: 12px;
+            padding-left: 20px;
+        }
+        
+        .storage-info-content li {
+            margin-bottom: 4px;
+            color: #475569;
+        }
+        
+        .storage-info-content .highlight {
+            background: #f0f9ff;
+            padding: 8px 12px;
+            border-radius: 6px;
+            margin: 8px 0;
+            border-left: 4px solid #0ea5e9;
+        }
+        
+        .data-management-modal .modal {
+            max-width: 600px;
+        }
+        
+        .data-actions {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+            margin-top: 20px;
+        }
+        
+        .data-action-card {
+            background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+            padding: 20px;
+            border-radius: 12px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            border: 2px solid transparent;
+        }
+        
+        .data-action-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
+            border-color: #4F46E5;
+            background: linear-gradient(135deg, #f1f5f9 0%, #cbd5e1 100%);
+        }
+        
+        .data-action-card i {
+            font-size: 32px;
+            margin-bottom: 12px;
+            color: #4F46E5;
+        }
+        
+        .data-action-card h4 {
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 8px;
+            color: #1e293b;
+        }
+        
+        .data-action-card p {
+            font-size: 12px;
+            color: #64748b;
+            line-height: 1.4;
+        }
+        
+        .export-options {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+            margin-top: 16px;
+        }
+        
+        .export-option {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 12px;
+            background: #f8fafc;
+            border-radius: 8px;
+            border: 2px solid #e2e8f0;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        
+        .export-option:hover {
+            border-color: #4F46E5;
+            background: #f1f5f9;
+        }
+        
+        .export-option input[type="checkbox"] {
+            width: 18px;
+            height: 18px;
+            accent-color: #4F46E5;
+        }
+        
+        .export-option label {
+            flex: 1;
+            cursor: pointer;
+            font-weight: 500;
+            color: #1e293b;
+        }
+        
+        .import-warning {
+            background: #fef3c7;
+            border: 2px solid #f59e0b;
+            border-radius: 8px;
+            padding: 12px;
+            margin: 16px 0;
+            color: #92400e;
+        }
+        
+        .import-warning h4 {
+            font-weight: 600;
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .import-warning p {
+            font-size: 12px;
+            line-height: 1.4;
+        }
+        
+        .import-file-input {
+            display: none;
+        }
+        
+        .import-file-label {
+            display: block;
+            text-align: center;
+            padding: 20px;
+            border: 2px dashed #e2e8f0;
+            border-radius: 8px;
+            background: #f8fafc;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            margin: 16px 0;
+        }
+        
+        .import-file-label:hover {
+            border-color: #4F46E5;
+            background: #f1f5f9;
+        }
+        
+        .import-file-label i {
+            font-size: 32px;
+            margin-bottom: 12px;
+            color: #4F46E5;
+        }
+        
+        .import-file-label p {
+            color: #64748b;
+        }
+        
+        .file-info {
+            background: #f0f9ff;
+            border: 2px solid #0ea5e9;
+            border-radius: 8px;
+            padding: 12px;
+            margin: 16px 0;
+            display: none;
+        }
+        
+        .file-info.show {
+            display: block;
+        }
+        
+        .file-info h4 {
+            font-weight: 600;
+            margin-bottom: 8px;
+            color: #0c4a6e;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .file-info p {
+            font-size: 12px;
+            color: #075985;
+        }
+        
+        /* 已选择标签样式 */
+        .selected-tag-item {
+            position: relative;
+            background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+            border: 2px solid #cbd5e1;
+            border-radius: 12px;
+            padding: 12px 16px;
+            padding-right: 40px;
+            margin: 4px;
+            transition: all 0.3s ease;
+            min-height: 70px;
+            max-width: 200px;
+        }
+        
+        .selected-tag-item:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
+            border-color: #4F46E5;
+        }
+        
+        .selected-tag-actions {
+            position: absolute;
+            top: 4px;
+            right: 4px;
+            display: flex;
+            gap: 2px;
+        }
+        
+        .selected-tag-btn {
+            width: 20px !important;
+            height: 20px !important;
+            font-size: 10px !important;
+            padding: 0 !important;
+            border-radius: 4px !important;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 20px;
+            min-height: 20px;
+            opacity: 0.8;
+        }
+        
+        .selected-tag-btn:hover {
+            opacity: 1;
+            transform: scale(1.1);
+        }
+        
+        /* 解析标签样式 */
+        .parsed-tag {
+            background: linear-gradient(135deg, #e0f2fe 0%, #bae6fd 100%);
+            color: #0c4a6e;
+            border: 2px solid #0ea5e9;
+            border-radius: 8px;
+            padding: 4px 12px;
+            margin: 2px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            font-size: 12px;
+            font-weight: 500;
+        }
+        
+        .parsed-tag.existing {
+            background: linear-gradient(135deg, #dcfce7 0%, #bbf7d0 100%);
+            border-color: #22c55e;
+            color: #166534;
+        }
+        
+        .parsed-tag.new {
+            background: linear-gradient(135deg, #f3e8ff 0%, #e9d5ff 100%);
+            border-color: #a855f7;
+            color: #6b21a8;
+            animation: pulse 2s infinite;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
+        }
+        
+        .parsed-tag:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        }
+        
+        /* 图片上传区域样式 */
+        .image-preview {
+            border: 2px dashed #e2e8f0;
+            border-radius: 8px;
+            padding: 20px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            background: #f8fafc;
+        }
+        
+        .image-preview:hover {
+            border-color: #4F46E5;
+            background: #f1f5f9;
+        }
+        
+        .image-preview-placeholder {
+            color: #64748b;
+        }
+        
+        .image-preview img {
+            max-width: 100%;
+            max-height: 200px;
+            border-radius: 4px;
+            display: none;
+        }
+        
+        .image-upload-input {
+            display: none;
+        }
+        
+        /* 自定义滚动条 */
+        .modal-content::-webkit-scrollbar {
+            width: 6px;
+        }
+        
+        .modal-content::-webkit-scrollbar-track {
+            background: #f1f5f9;
+            border-radius: 3px;
+        }
+        
+        .modal-content::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 3px;
+        }
+        
+        .modal-content::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
+        }
+    </style>
+</head>
+<body class="min-h-screen py-6 px-4">
+    <div class="max-w-7xl mx-auto">
+        <!-- 主标题 -->
+        <h1 class="main-title">Comfy UI Prompt Generator v12.5</h1>
+        <p class="subtitle">智能提示词管理工具 - 支持数据导出导入和本地存储</p>
+        
+        <!-- 已选择标签区域 -->
+        <div class="app-card">
+            <div class="title-bar">
+                <h3 class="section-title">
+                    <i class="fas fa-tags text-primary mr-2"></i> 已选择标签
+                </h3>
+                <div class="title-actions">
+                    <!-- 功能开关 -->
+                    <div class="flex flex-wrap gap-2">
+                        <button id="togglePlusMinus" class="btn btn-primary">
+                            <i class="fas fa-plus-minus"></i> 加减号
+                        </button>
+                        <button id="toggleDelete" class="btn btn-warning">
+                            <i class="fas fa-trash"></i> 删除X
+                        </button>
+                        <button id="toggleR18" class="btn btn-danger">
+                            <i class="fas fa-eye-slash"></i> R18Off
+                        </button>
+                    </div>
+                    
+                    <!-- 操作按钮 -->
+                    <div class="flex flex-wrap gap-2">
+                        <button id="clearAllBtn" class="btn btn-danger">
+                            <i class="fas fa-broom"></i> 清空
+                        </button>
+                    </div>
+                </div>
+            </div>
+            
+            <div id="selectedTags" class="tags-container min-h-[70px] p-3 bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl border-2 border-dashed border-gray-300 transition-all duration-300">
+                <p class="text-gray-400 text-center w-full self-center py-3">点击下方标签添加到这里...</p>
+            </div>
+        </div>
+        
+        <!-- 生成的提示词区域 -->
+        <div class="app-card">
+            <h3 class="text-xl font-semibold mb-4">
+                <i class="fas fa-magic text-primary mr-2"></i> 生成的提示词
+            </h3>
+            <div class="flex gap-2">
+                <textarea id="positivePrompt" class="flex-1 form-control bg-gradient-to-br from-white to-gray-50 border-2 border-purple-200 resize-none min-h-[100px] font-mono text-gray-800 text-sm" placeholder="在此粘贴提示词，系统会自动解析..."></textarea>
+                <div class="flex flex-col gap-2">
+                    <button id="pasteAnalyzeBtn" class="btn btn-info">
+                        <i class="fas fa-magic"></i> 解析粘贴
+                    </button>
+                    <button id="copyPrompt" class="btn btn-primary">
+                        <i class="fas fa-copy"></i> 复制
+                    </button>
+                    <button id="downloadPrompt" class="btn btn-success">
+                        <i class="fas fa-download"></i> 下载
+                    </button>
+                </div>
+            </div>
+            
+            <!-- 解析标签结果显示区域 -->
+            <div id="parsedTagsContainer" class="parsed-tags-container hidden mt-4">
+                <h4 class="font-semibold text-gray-800 mb-2">解析结果：</h4>
+                <div id="parsedTagsList" class="flex flex-wrap gap-1">
+                    <!-- 解析出的标签将显示在这里 -->
+                </div>
+            </div>
+        </div>
+        
+        <!-- 标签选择区域 -->
+        <div class="app-card">
+            <!-- Tag标题区域 -->
+            <div class="title-bar">
+                <h3 class="section-title">
+                    <i class="fas fa-tags text-primary"></i> Tag
+                </h3>
+                <div class="title-actions">
+                    <button id="editModeBtn" class="btn btn-primary">
+                        <i class="fas fa-edit"></i> 编辑模式
+                    </button>
+                    <button id="manageMainCategoriesBtn" class="btn btn-info">
+                        <i class="fas fa-th-large"></i> 主分类管理
+                    </button>
+                    <button id="showStorageInfoBtn" class="btn btn-secondary">
+                        <i class="fas fa-info-circle"></i> 数据存储
+                    </button>
+                    <button id="showDataManagementBtn" class="btn btn-warning">
+                        <i class="fas fa-database"></i> 数据管理
+                    </button>
+                </div>
+            </div>
+            
+            <!-- 标签页容器 -->
+            <div class="mb-4">
+                <div class="flex gap-1 overflow-x-auto" id="tagTabContainer">
+                    <!-- 标签页将通过JavaScript动态生成 -->
+                </div>
+            </div>
+            
+            <!-- 标签内容区域 -->
+            <div id="tagsContent" class="tags-scroll-container">
+                <!-- 标签将通过JavaScript动态生成 -->
+            </div>
+        </div>
+        
+        <!-- 预设管理区域 -->
+        <div class="app-card">
+            <div class="title-bar">
+                <h3 class="section-title">
+                    <i class="fas fa-cogs text-primary"></i> 预设管理
+                </h3>
+                <div class="flex gap-2">
+                    <button id="newPresetBtn" class="btn btn-success">
+                        <i class="fas fa-plus"></i> 新建预设
+                    </button>
+                    <button id="managePresetCategoriesBtn" class="btn btn-info">
+                        <i class="fas fa-th-large"></i> 分类管理
+                    </button>
+                </div>
+            </div>
+            
+            <!-- 预设标签页 -->
+            <div class="mb-4">
+                <div class="flex gap-1 overflow-x-auto" id="presetTabContainer">
+                    <!-- 预设标签页将通过JavaScript动态生成 -->
+                </div>
+            </div>
+            
+            <!-- 预设内容区域 -->
+            <div id="presetContent" class="min-h-[100px] p-4 bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl border-2 border-dashed border-gray-300">
+                <div class="text-center text-gray-400 py-6">
+                    <i class="fas fa-lightbulb text-3xl mb-2 text-yellow-400"></i>
+                    <p>选择预设分类查看预设列表</p>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 数据管理模态框 -->
+    <div id="dataManagementModal" class="modal-overlay data-management-modal">
+        <div class="modal">
+            <div class="modal-title">
+                <i class="fas fa-database text-blue-500 mr-2"></i>
+                数据管理中心
+            </div>
+            <div class="modal-content">
+                <div class="modal-body">
+                    <p class="text-gray-600 mb-4">
+                        管理您的标签、预设和配置数据。支持导出到文件和从文件导入，方便备份和迁移数据。
+                    </p>
+                    
+                    <div class="data-actions">
+                        <div class="data-action-card" onclick="showExportOptions()">
+                            <i class="fas fa-download"></i>
+                            <h4>导出数据</h4>
+                            <p>将当前数据导出到文件保存</p>
+                        </div>
+                        <div class="data-action-card" onclick="showImportOptions()">
+                            <i class="fas fa-upload"></i>
+                            <h4>导入数据</h4>
+                            <p>从文件导入之前导出的数据</p>
+                        </div>
+                        <div class="data-action-card" onclick="resetAllData()">
+                            <i class="fas fa-broom"></i>
+                            <h4>重置数据</h4>
+                            <p>恢复到初始默认状态</p>
+                        </div>
+                        <div class="data-action-card" onclick="showLocalStorageInfo()">
+                            <i class="fas fa-info-circle"></i>
+                            <h4>存储信息</h4>
+                            <p>查看本地存储状态</p>
+                        </div>
+                    </div>
+                    
+                    <!-- 导出选项 -->
+                    <div id="exportOptions" class="hidden">
+                        <h4 class="font-semibold mt-6 mb-4">选择要导出的数据类型：</h4>
+                        <div class="export-options">
+                            <div class="export-option">
+                                <input type="checkbox" id="exportTags" checked>
+                                <label for="exportTags">标签数据</label>
+                            </div>
+                            <div class="export-option">
+                                <input type="checkbox" id="exportPresets" checked>
+                                <label for="exportPresets">预设数据</label>
+                            </div>
+                            <div class="export-option">
+                                <input type="checkbox" id="exportCategories" checked>
+                                <label for="exportCategories">分类配置</label>
+                            </div>
+                            <div class="export-option">
+                                <input type="checkbox" id="exportSettings" checked>
+                                <label for="exportSettings">界面设置</label>
+                            </div>
+                        </div>
+                        <div class="flex gap-2 mt-6">
+                            <button class="btn btn-secondary flex-1" onclick="hideExportOptions()">取消</button>
+                            <button class="btn btn-primary flex-1" onclick="exportData()">开始导出</button>
+                        </div>
+                    </div>
+                    
+                    <!-- 导入选项 -->
+                    <div id="importOptions" class="hidden">
+                        <div class="import-warning">
+                            <h4><i class="fas fa-exclamation-triangle"></i> 导入警告</h4>
+                            <p>导入数据将覆盖当前的标签、预设和配置。建议先导出备份当前数据。</p>
+                        </div>
+                        
+                        <label class="import-file-label" for="importFileInput">
+                            <i class="fas fa-cloud-upload-alt"></i>
+                            <p>点击选择文件或拖拽到此处</p>
+                            <p class="text-xs mt-2">支持 .json 格式文件</p>
+                        </label>
+                        <input type="file" id="importFileInput" class="import-file-input" accept=".json">
+                        
+                        <div id="fileInfo" class="file-info">
+                            <h4><i class="fas fa-file-alt"></i> 选中文件</h4>
+                            <p id="fileName"></p>
+                        </div>
+                        
+                        <div class="flex gap-2 mt-6">
+                            <button class="btn btn-secondary flex-1" onclick="hideImportOptions()">取消</button>
+                            <button class="btn btn-primary flex-1" onclick="importData()" id="importBtn" disabled>开始导入</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button id="closeDataManagementBtn" class="btn btn-secondary">关闭</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 数据存储说明模态框 -->
+    <div id="storageInfoModal" class="modal-overlay storage-info-modal">
+        <div class="modal">
+            <div class="modal-title">
+                <i class="fas fa-database text-blue-500 mr-2"></i>
+                数据存储说明
+            </div>
+            <div class="modal-content">
+                <div class="modal-body storage-info-content">
+                    <h4>关于浏览器存储限制</h4>
+                    <div class="highlight">
+                        <strong>重要说明：</strong>由于浏览器的安全限制，网页应用无法直接访问和修改您计算机上的任意文件夹。这是为了保护用户隐私和安全。
+                    </div>
+                    
+                    <h4>当前数据存储方式</h4>
+                    <p>所有在本工具中添加的标签、图片、提示词、预设等数据，都存储在您当前使用的浏览器的 <strong>localStorage</strong> 中。</p>
+                    
+                    <h4>localStorage 特点</h4>
+                    <p>localStorage 是浏览器提供的本地存储机制，数据会一直保留，除非：</p>
+                    <ul>
+                        <li>用户手动清除浏览器数据</li>
+                        <li>浏览器自动清理（如隐私浏览模式下关闭窗口后）</li>
+                        <li>使用安全软件清理痕迹</li>
+                    </ul>
+                    
+                    <h4>数据持久性</h4>
+                    <div class="highlight">
+                        <strong>✓ 重新打开页面：</strong>数据会自动加载和恢复，您添加的所有内容都会保留。
+                    </div>
+                    <div class="highlight">
+                        <strong>✓ 关闭浏览器后重新打开：</strong>数据依然存在，不会丢失。
+                    </div>
+                    <div class="highlight">
+                        <strong>✗ 不同浏览器之间：</strong>数据不共享，Chrome的数据不会出现在Firefox中。
+                    </div>
+                    <div class="highlight">
+                        <strong>✗ 不同设备之间：</strong>数据存储在当前设备上，换电脑或手机后需要重新设置。
+                    </div>
+                    
+                    <h4>如何实现"指定文件夹"存储</h4>
+                    <p>虽然浏览器无法直接访问指定文件夹，但您可以使用我们提供的 <strong>数据导出/导入功能</strong>：</p>
+                    <ol>
+                        <li>使用"数据管理"功能将数据导出到JSON文件</li>
+                        <li>将导出的文件保存到您指定的文件夹中</li>
+                        <li>下次使用时，从该文件夹导入数据文件</li>
+                    </ol>
+                    
+                    <h4>推荐的数据管理流程</h4>
+                    <ul>
+                        <li>定期导出数据备份到您的文档文件夹</li>
+                        <li>在不同设备间迁移时，使用导出/导入功能</li>
+                        <li>重要数据变更前先导出备份</li>
+                    </ul>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button id="closeStorageInfoBtn" class="btn btn-primary">我知道了</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 新建预设模态框 -->
+    <div id="newPresetModal" class="modal-overlay new-preset-modal">
+        <div class="modal">
+            <div class="modal-title">
+                <i class="fas fa-plus text-blue-500 mr-2"></i>
+                新建预设
+            </div>
+            <div class="modal-content">
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label class="form-label">预设名称 <span class="text-red-500">*</span></label>
+                        <input type="text" id="presetName" class="form-control" placeholder="输入预设名称..." required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">提示词 <span class="text-red-500">*</span></label>
+                        <textarea id="presetPrompt" class="form-control" placeholder="输入提示词..." rows="4" required></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">备注 (可选)</label>
+                        <textarea id="presetDescription" class="form-control" placeholder="输入备注信息..." rows="2"></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">图片 (可选)</label>
+                        <div class="image-preview" id="imagePreview">
+                            <div class="image-preview-placeholder">
+                                <i class="fas fa-cloud-upload-alt text-2xl mb-2"></i>
+                                <p>点击上传图片或拖拽到此处</p>
+                            </div>
+                            <input type="file" id="imageUpload" class="image-upload-input" accept="image/*">
+                        </div>
+                        <p class="text-xs text-gray-500 mt-1">支持JPG、PNG格式，建议尺寸400x300</p>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">预设分类</label>
+                        <select id="presetCategory" class="form-control">
+                            <option value="anime">动漫风格</option>
+                            <option value="realistic">写实风格</option>
+                            <option value="artistic">艺术风格</option>
+                            <option value="portrait">人像摄影</option>
+                            <option value="landscape">风景摄影</option>
+                            <option value="custom">自定义</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button id="cancelNewPresetBtn" class="btn btn-secondary">取消</button>
+                <button id="confirmNewPresetBtn" class="btn btn-success">创建</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 编辑预设模态框 -->
+    <div id="editPresetModal" class="modal-overlay new-preset-modal">
+        <div class="modal">
+            <div class="modal-title">
+                <i class="fas fa-edit text-blue-500 mr-2"></i>
+                编辑预设
+            </div>
+            <div class="modal-content">
+                <div class="modal-body">
+                    <input type="hidden" id="editPresetId">
+                    <div class="form-group">
+                        <label class="form-label">预设名称 <span class="text-red-500">*</span></label>
+                        <input type="text" id="editPresetName" class="form-control" placeholder="输入预设名称..." required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">提示词 <span class="text-red-500">*</span></label>
+                        <textarea id="editPresetPrompt" class="form-control" placeholder="输入提示词..." rows="4" required></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">备注 (可选)</label>
+                        <textarea id="editPresetDescription" class="form-control" placeholder="输入备注信息..." rows="2"></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">图片 (可选)</label>
+                        <div class="image-preview" id="editImagePreview">
+                            <div class="image-preview-placeholder">
+                                <i class="fas fa-cloud-upload-alt text-2xl mb-2"></i>
+                                <p>点击上传图片或拖拽到此处</p>
+                            </div>
+                            <input type="file" id="editImageUpload" class="image-upload-input" accept="image/*">
+                        </div>
+                        <p class="text-xs text-gray-500 mt-1">支持JPG、PNG格式，建议尺寸400x300</p>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">预设分类</label>
+                        <select id="editPresetCategory" class="form-control">
+                            <option value="anime">动漫风格</option>
+                            <option value="realistic">写实风格</option>
+                            <option value="artistic">艺术风格</option>
+                            <option value="portrait">人像摄影</option>
+                            <option value="landscape">风景摄影</option>
+                            <option value="custom">自定义</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button id="cancelEditPresetBtn" class="btn btn-secondary">取消</button>
+                <button id="confirmEditPresetBtn" class="btn btn-success">保存</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 编辑标签模态框 -->
+    <div id="editTagModal" class="modal-overlay edit-tag-modal">
+        <div class="modal">
+            <div class="modal-title">
+                <i class="fas fa-edit text-blue-500 mr-2"></i>
+                编辑标签
+            </div>
+            <div class="modal-content">
+                <div class="modal-body">
+                    <input type="hidden" id="editTagId">
+                    <input type="hidden" id="editTagCategory">
+                    <div class="form-group">
+                        <label class="form-label">英文文本 <span class="text-red-500">*</span></label>
+                        <input type="text" id="editTagEnglishText" class="form-control" placeholder="输入标签英文文本..." required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">中文名称 <span class="text-red-500">*</span></label>
+                        <input type="text" id="editTagChineseName" class="form-control" placeholder="输入标签中文名称..." required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">所属分组</label>
+                        <select id="editTagGroup" class="form-control">
+                            <option value="default">默认分组</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button id="cancelEditTagBtn" class="btn btn-secondary">取消</button>
+                <button id="confirmEditTagBtn" class="btn btn-primary">保存</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 编辑新标签模态框 -->
+    <div id="editNewTagModal" class="modal-overlay edit-tag-modal">
+        <div class="modal">
+            <div class="modal-title">
+                <i class="fas fa-plus text-purple-500 mr-2"></i>
+                添加新标签
+            </div>
+            <div class="modal-content">
+                <div class="modal-body">
+                    <input type="hidden" id="newTagText">
+                    <div class="form-group">
+                        <label class="form-label">英文文本 <span class="text-red-500">*</span></label>
+                        <input type="text" id="tagEnglishText" class="form-control" placeholder="输入标签英文文本..." required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">中文名称 <span class="text-red-500">*</span></label>
+                        <input type="text" id="tagChineseName" class="form-control" placeholder="输入标签中文名称..." required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">所属分类</label>
+                        <select id="tagCategory" class="form-control">
+                            <!-- 分类选项将通过JavaScript动态生成 -->
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">所属分组</label>
+                        <select id="tagGroup" class="form-control">
+                            <option value="default">默认分组</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button id="cancelNewTagBtn" class="btn btn-secondary">取消</button>
+                <button id="confirmNewTagBtn" class="btn btn-purple">创建标签</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 主分类管理模态框 -->
+    <div id="mainCategoryManagementModal" class="modal-overlay group-management-modal">
+        <div class="modal">
+            <div class="modal-title">
+                <i class="fas fa-th-large text-blue-500 mr-2"></i>
+                主分类管理
+            </div>
+            <div class="modal-content">
+                <div class="modal-body">
+                    <!-- 添加新分类表单 - 移到顶部 -->
+                    <div class="add-group-form mb-4">
+                        <input type="text" id="newMainCategoryName" placeholder="输入新分类名称..." class="form-control mb-2">
+                        <button id="addNewMainCategoryBtn" class="btn btn-success">
+                            <i class="fas fa-plus"></i> 添加分类
+                        </button>
+                    </div>
+                    
+                    <div id="mainCategoryList" class="space-y-2">
+                        <!-- 主分类列表将通过JavaScript动态生成 -->
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button id="closeMainCategoryManagementBtn" class="btn btn-secondary">关闭</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 预设分类管理模态框 -->
+    <div id="presetCategoryManagementModal" class="modal-overlay group-management-modal">
+        <div class="modal">
+            <div class="modal-title">
+                <i class="fas fa-th-large text-blue-500 mr-2"></i>
+                预设分类管理
+            </div>
+            <div class="modal-content">
+                <div class="modal-body">
+                    <!-- 添加新分类表单 - 移到顶部 -->
+                    <div class="add-group-form mb-4">
+                        <input type="text" id="newPresetCategoryName" placeholder="输入新预设分类名称..." class="form-control mb-2">
+                        <button id="addNewPresetCategoryBtn" class="btn btn-success">
+                            <i class="fas fa-plus"></i> 添加分类
+                        </button>
+                    </div>
+                    
+                    <div id="presetCategoryList" class="space-y-2">
+                        <!-- 预设分类列表将通过JavaScript动态生成 -->
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button id="closePresetCategoryManagementBtn" class="btn btn-secondary">关闭</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 通知组件 -->
+    <div id="notification" class="notification"></div>
+
+    <script>
+        // 全局变量
+        let settings = {
+            showPlusMinus: true,
+            weightSymbol: '()',
+            showDelete: true,
+            showR18Groups: false,
+            showNegative: false,
+            currentTab: 'favorites',
+            currentPresetTab: 'anime',
+            selectedTags: [],
+            tags: {},
+            groups: {},
+            mainCategories: [],
+            presets: {},
+            tagEditingMode: false,
+            favorites: [],
+            parsedTags: [],
+            presetCategories: []
+        };
+
+        // 默认主分类配置
+        const defaultMainCategories = [
+            { id: 'favorites', name: '收藏', color: '#f59e0b', isSystem: true },
+            { id: 'quality', name: '质量', color: '#dc2626', isSystem: true },
+            { id: 'style', name: '风格', color: '#2563eb', isSystem: true },
+            { id: 'character', name: '人物', color: '#059669', isSystem: true },
+            { id: 'environment', name: '环境', color: '#7c3aed', isSystem: true },
+            { id: 'lighting', name: '光影', color: '#ea580c', isSystem: true },
+            { id: 'details', name: '细节', color: '#0891b2', isSystem: true },
+            { id: 'negative', name: '负面', color: '#4b5563', isSystem: true },
+            { id: 'custom', name: '自定义', color: '#d97706', isSystem: true },
+            { id: 'r18', name: 'R18', color: '#db2777', isSystem: true }
+        ];
+
+        // 默认标签数据
+        const defaultTags = {
+            quality: [
+                { id: 'q1', text: 'masterpiece', name: '杰作', color: '#dc2626', group: 'default', pinned: true, favorite: false, allowPin: true, allowFavorite: true },
+                { id: 'q2', text: 'best quality', name: '最佳质量', color: '#dc2626', group: 'default', pinned: true, favorite: false, allowPin: true, allowFavorite: true },
+                { id: 'q3', text: 'high quality', name: '高质量', color: '#dc2626', group: 'default', pinned: false, favorite: false, allowPin: true, allowFavorite: true },
+                { id: 'q4', text: 'ultra detailed', name: '超细节', color: '#dc2626', group: 'default', pinned: false, favorite: false, allowPin: true, allowFavorite: true },
+                { id: 'q5', text: 'intricate details', name: '复杂细节', color: '#dc2626', group: 'default', pinned: false, favorite: false, allowPin: true, allowFavorite: true },
+                { id: 'q6', text: 'sharp focus', name: '锐利对焦', color: '#dc2626', group: 'default', pinned: false, favorite: false, allowPin: true, allowFavorite: true },
+                { id: 'q7', text: 'vibrant colors', name: '鲜艳色彩', color: '#dc2626', group: 'default', pinned: false, favorite: false, allowPin: true, allowFavorite: true },
+                { id: 'q8', text: 'professional', name: '专业级', color: '#dc2626', group: 'default', pinned: false, favorite: false, allowPin: true, allowFavorite: true },
+                { id: 'q9', text: 'award winning', name: '获奖作品', color: '#dc2626', group: 'default', pinned: false, favorite: false, allowPin: true, allowFavorite: true },
+                { id: 'q10', text: 'cinematic lighting', name: '电影级光影', color: '#dc2626', group: 'default', pinned: false, favorite: false, allowPin: true, allowFavorite: true },
+                { id: 'q11', text: 'studio quality', name: '工作室质量', color: '#dc2626', group: 'default', pinned: false, favorite: false, allowPin: true, allowFavorite: true },
+                { id: 'q12', text: 'highly detailed', name: '高度细节', color: '#dc2626', group: 'default', pinned: false, favorite: false, allowPin: true, allowFavorite: true }
+            ],
+            style: [
+                { id: 's1', text: 'anime', name: '动漫', color: '#2563eb', group: 'default', pinned: false, favorite: false, allowPin: true, allowFavorite: true },
+                { id: 's2', text: 'manga', name: '漫画', color: '#2563eb', group: 'default', pinned: false, favorite: false, allowPin: true, allowFavorite: true },
+                { id: 's3', text: 'realistic', name: '写实', color: '#2563eb', group: 'default', pinned: false, favorite: false, allowPin: true, allowFavorite: true },
+                { id: 's4', text: 'digital art', name: '数字艺术', color: '#2563eb', group: 'default', pinned: false, favorite: false, allowPin: true, allowFavorite: true },
+                { id: 's5', text: 'oil painting', name: '油画', color: '#2563eb', group: 'default', pinned: false, favorite: false, allowPin: true, allowFavorite: true },
+                { id: 's6', text: 'watercolor', name: '水彩画', color: '#2563eb', group: 'default', pinned: false, favorite: false, allowPin: true, allowFavorite: true },
+                { id: 's7', text: 'sketch', name: '素描', color: '#2563eb', group: 'default', pinned: false, favorite: false, allowPin: true, allowFavorite: true },
+                { id: 's8', text: 'photorealistic', name: '照片写实', color: '#2563eb', group: 'default', pinned: false, favorite: false, allowPin: true, allowFavorite: true },
+                { id: 's9', text: 'impressionism', name: '印象派', color: '#2563eb', group: 'default', pinned: false, favorite: false, allowPin: true, allowFavorite: true },
+                { id: 's10', text: 'surrealism', name: '超现实主义', color: '#2563eb', group: 'default', pinned: false, favorite: false, allowPin: true, allowFavorite: true }
+            ],
+            character: [
+                { id: 'c1', text: 'beautiful girl', name: '美丽女孩', color: '#059669', group: 'character_group', pinned: false, favorite: false, allowPin: true, allowFavorite: true },
+                { id: 'c2', text: 'cute girl', name: '可爱女孩', color: '#059669', group: 'character_group', pinned: false, favorite: false, allowPin: true, allowFavorite: true },
+                { id: 'c3', text: 'handsome boy', name: '帅气男孩', color: '#059669', group: 'character_group', pinned: false, favorite: false, allowPin: true, allowFavorite: true },
+                { id: 'c4', text: 'young woman', name: '年轻女性', color: '#059669', group: 'character_group', pinned: false, favorite: false, allowPin: true, allowFavorite: true },
+                { id: 'c5', text: 'young man', name: '年轻男性', color: '#059669', group: 'character_group', pinned: false, favorite: false, allowPin: true, allowFavorite: true },
+                { id: 'c6', text: 'elderly woman', name: '老年女性', color: '#059669', group: 'character_group', pinned: false, favorite: false, allowPin: true, allowFavorite: true },
+                { id: 'c7', text: 'elderly man', name: '老年男性', color: '#059669', group: 'character_group', pinned: false, favorite: false, allowPin: true, allowFavorite: true },
+                { id: 'c8', text: 'child', name: '儿童', color: '#059669', group: 'character_group', pinned: false, favorite: false, allowPin: true, allowFavorite: true },
+                { id: 'c9', text: 'teenager', name: '青少年', color: '#059669', group: 'character_group', pinned: false, favorite: false, allowPin: true, allowFavorite: true },
+                { id: 'c10', text: 'fantasy character', name: '奇幻角色', color: '#059669', group: 'character_group', pinned: false, favorite: false, allowPin: true, allowFavorite: true }
+            ],
+            environment: [
+                { id: 'e1', text: 'outdoor', name: '户外', color: '#7c3aed', group: 'default', pinned: false, favorite: false, allowPin: true, allowFavorite: true },
+                { id: 'e2', text: 'indoor', name: '室内', color: '#7c3aed', group: 'default', pinned: false, favorite: false, allowPin: true, allowFavorite: true },
+                { id: 'e3', text: 'cityscape', name: '城市景观', color: '#7c3aed', group: 'default', pinned: false, favorite: false, allowPin: true, allowFavorite: true },
+                { id: 'e4', text: 'nature', name: '自然', color: '#7c3aed', group: 'default', pinned: false, favorite: false, allowPin: true, allowFavorite: true },
+                { id: 'e5', text: 'forest', name: '森林', color: '#7c3aed', group: 'default', pinned: false, favorite: false, allowPin: true, allowFavorite: true },
+                { id: 'e6', text: 'mountains', name: '山脉', color: '#7c3aed', group: 'default', pinned: false, favorite: false, allowPin: true, allowFavorite: true },
+                { id: 'e7', text: 'beach', name: '海滩', color: '#7c3aed', group: 'default', pinned: false, favorite: false, allowPin: true, allowFavorite: true },
+                { id: 'e8', text: 'space', name: '太空', color: '#7c3aed', group: 'default', pinned: false, favorite: false, allowPin: true, allowFavorite: true },
+                { id: 'e9', text: 'castle', name: '城堡', color: '#7c3aed', group: 'default', pinned: false, favorite: false, allowPin: true, allowFavorite: true },
+                { id: 'e10', text: 'futuristic city', name: '未来城市', color: '#7c3aed', group: 'default', pinned: false, favorite: false, allowPin: true, allowFavorite: true }
+            ],
+            lighting: [
+                { id: 'l1', text: 'dynamic lighting', name: '动态光影', color: '#ea580c', group: 'default', pinned: false, favorite: false, allowPin: true, allowFavorite: true },
+                { id: 'l2', text: 'soft lighting', name: '柔和光影', color: '#ea580c', group: 'default', pinned: false, favorite: false, allowPin: true, allowFavorite: true },
+                { id: 'l3', text: 'backlighting', name: '逆光', color: '#ea580c', group: 'default', pinned: false, favorite: false, allowPin: true, allowFavorite: true },
+                { id: 'l4', text: 'side lighting', name: '侧光', color: '#ea580c', group: 'default', pinned: false, favorite: false, allowPin: true, allowFavorite: true },
+                { id: 'l5', text: 'front lighting', name: '正面光', color: '#ea580c', group: 'default', pinned: false, favorite: false, allowPin: true, allowFavorite: true },
+                { id: 'l6', text: 'rim lighting', name: '轮廓光', color: '#ea580c', group: 'default', pinned: false, favorite: false, allowPin: true, allowFavorite: true },
+                { id: 'l7', text: 'dramatic lighting', name: '戏剧光影', color: '#ea580c', group: 'default', pinned: false, favorite: false, allowPin: true, allowFavorite: true },
+                { id: 'l8', text: 'natural lighting', name: '自然光', color: '#ea580c', group: 'default', pinned: false, favorite: false, allowPin: true, allowFavorite: true },
+                { id: 'l9', text: 'studio lighting', name: '工作室光', color: '#ea580c', group: 'default', pinned: false, favorite: false, allowPin: true, allowFavorite: true },
+                { id: 'l10', text: 'neon lighting', name: '霓虹光', color: '#ea580c', group: 'default', pinned: false, favorite: false, allowPin: true, allowFavorite: true }
+            ],
+            details: [
+                { id: 'd1', text: 'intricate details', name: '复杂细节', color: '#0891b2', group: 'default', pinned: false, favorite: false, allowPin: true, allowFavorite: true },
+                { id: 'd2', text: 'sharp focus', name: '锐利对焦', color: '#0891b2', group: 'default', pinned: false, favorite: false, allowPin: true, allowFavorite: true },
+                { id: 'd3', text: 'depth of field', name: '景深', color: '#0891b2', group: 'default', pinned: false, favorite: false, allowPin: true, allowFavorite: true },
+                { id: 'd4', text: 'bokeh', name: '虚化背景', color: '#0891b2', group: 'default', pinned: false, favorite: false, allowPin: true, allowFavorite: true },
+                { id: 'd5', text: 'highly detailed', name: '高度细节', color: '#0891b2', group: 'default', pinned: false, favorite: false, allowPin: true, allowFavorite: true },
+                { id: 'd6', text: 'texture', name: '纹理', color: '#0891b2', group: 'default', pinned: false, favorite: false, allowPin: true, allowFavorite: true },
+                { id: 'd7', text: 'macro', name: '微距', color: '#0891b2', group: 'default', pinned: false, favorite: false, allowPin: true, allowFavorite: true },
+                { id: 'd8', text: 'close-up', name: '特写', color: '#0891b2', group: 'default', pinned: false, favorite: false, allowPin: true, allowFavorite: true },
+                { id: 'd9', text: 'wide shot', name: '广角', color: '#0891b2', group: 'default', pinned: false, favorite: false, allowPin: true, allowFavorite: true },
+                { id: 'd10', text: 'panoramic', name: '全景', color: '#0891b2', group: 'default', pinned: false, favorite: false, allowPin: true, allowFavorite: true }
+            ],
+            negative: [
+                { id: 'n1', text: 'lowres', name: '低分辨率', color: '#4b5563', group: 'default', pinned: false, favorite: false, allowPin: false, allowFavorite: true },
+                { id: 'n2', text: 'bad anatomy', name: '解剖错误', color: '#4b5563', group: 'default', pinned: false, favorite: false, allowPin: false, allowFavorite: true },
+                { id: 'n3', text: 'text', name: '文字', color: '#4b5563', group: 'default', pinned: false, favorite: false, allowPin: false, allowFavorite: true },
+                { id: 'n4', text: 'error', name: '错误', color: '#4b5563', group: 'default', pinned: false, favorite: false, allowPin: false, allowFavorite: true },
+                { id: 'n5', text: 'missing fingers', name: '缺少手指', color: '#4b5563', group: 'default', pinned: false, favorite: false, allowPin: false, allowFavorite: true },
+                { id: 'n6', text: 'extra digits', name: '多余手指', color: '#4b5563', group: 'default', pinned: false, favorite: false, allowPin: false, allowFavorite: true },
+                { id: 'n7', text: 'fewer digits', name: '少于手指', color: '#4b5563', group: 'default', pinned: false, favorite: false, allowPin: false, allowFavorite: true },
+                { id: 'n8', text: 'cropped', name: '裁剪', color: '#4b5563', group: 'default', pinned: false, favorite: false, allowPin: false, allowFavorite: true },
+                { id: 'n9', text: 'worst quality', name: '最差质量', color: '#4b5563', group: 'default', pinned: false, favorite: false, allowPin: false, allowFavorite: true },
+                { id: 'n10', text: 'low quality', name: '低质量', color: '#4b5563', group: 'default', pinned: false, favorite: false, allowPin: false, allowFavorite: true }
+            ],
+            r18: [
+                { id: 'r1', text: 'highly detailed nude', name: '高细节裸体', color: '#db2777', group: 'default', pinned: false, favorite: false, allowPin: true, allowFavorite: true },
+                { id: 'r2', text: 'naked', name: '裸体', color: '#db2777', group: 'default', pinned: false, favorite: false, allowPin: true, allowFavorite: true },
+                { id: 'r3', text: 'erotic', name: '情色', color: '#db2777', group: 'default', pinned: false, favorite: false, allowPin: true, allowFavorite: true },
+                { id: 'r4', text: 'sex', name: '性行为', color: '#db2777', group: 'default', pinned: false, favorite: false, allowPin: true, allowFavorite: true },
+                { id: 'r5', text: 'porn', name: '色情内容', color: '#db2777', group: 'default', pinned: false, favorite: false, allowPin: true, allowFavorite: true }
+            ]
+        };
+
+        // 默认分组配置
+        const defaultGroups = {
+            quality: [{ id: 'default', name: '默认分组' }],
+            style: [{ id: 'default', name: '默认分组' }],
+            character: [{ id: 'character_group', name: '人物组' }],
+            environment: [{ id: 'default', name: '默认分组' }],
+            lighting: [{ id: 'default', name: '默认分组' }],
+            details: [{ id: 'default', name: '默认分组' }],
+            negative: [{ id: 'default', name: '默认分组' }],
+            custom: [{ id: 'default', name: '默认分组' }],
+            favorites: [{ id: 'default', name: '收藏标签' }],
+            r18: [{ id: 'default', name: '默认分组' }]
+        };
+
+        // 默认预设分类
+        const defaultPresetCategories = [
+            { id: 'anime', name: '动漫风格', isSystem: true },
+            { id: 'realistic', name: '写实风格', isSystem: true },
+            { id: 'artistic', name: '艺术风格', isSystem: true },
+            { id: 'portrait', name: '人像摄影', isSystem: true },
+            { id: 'landscape', name: '风景摄影', isSystem: true },
+            { id: 'custom', name: '自定义', isSystem: false }
+        ];
+
+        // 默认预设数据
+        const defaultPresets = {
+            anime: [
+                {
+                    id: 'anime_1',
+                    name: '高质量动漫',
+                    prompt: 'masterpiece, best quality, anime, intricate details, beautiful girl, outdoor, dynamic lighting',
+                    description: '经典动漫风格，高细节，鲜艳色彩',
+                    image: '',
+                    category: 'anime'
+                },
+                {
+                    id: 'anime_2',
+                    name: '萌系动漫',
+                    prompt: 'masterpiece, manga, cute girl, soft lighting, indoor, detailed background',
+                    description: '可爱萌系风格，大眼睛，柔和色彩',
+                    image: '',
+                    category: 'anime'
+                },
+                {
+                    id: 'anime_3',
+                    name: '奇幻动漫',
+                    prompt: 'fantasy anime, magical girl, detailed background, dynamic lighting, high quality',
+                    description: '奇幻风格动漫，魔法元素丰富',
+                    image: '',
+                    category: 'anime'
+                }
+            ],
+            realistic: [
+                {
+                    id: 'realistic_1',
+                    name: '写实人像',
+                    prompt: 'masterpiece, realistic, beautiful woman, portrait photography, natural lighting, sharp focus',
+                    description: '超写实人像摄影风格',
+                    image: '',
+                    category: 'realistic'
+                },
+                {
+                    id: 'realistic_2',
+                    name: '风景摄影',
+                    prompt: 'landscape photography, beautiful nature, mountains, sunset, golden hour, high quality',
+                    description: '专业风景摄影风格',
+                    image: '',
+                    category: 'realistic'
+                }
+            ],
+            artistic: [
+                {
+                    id: 'artistic_1',
+                    name: '油画风格',
+                    prompt: 'oil painting, artistic, impressionism, beautiful landscape, vibrant colors, masterful',
+                    description: '经典油画艺术风格',
+                    image: '',
+                    category: 'artistic'
+                }
+            ]
+        };
+
+        // 初始化
+        document.addEventListener('DOMContentLoaded', function() {
+            initializeApp();
+        });
+
+        function initializeApp() {
+            loadData();
+            initializeEventListeners();
+            setupModalClickOutsideClose();
+            renderTagTabButtons();
+            renderPresetTabButtons();
+            renderTags();
+            renderPresets();
+            updateSelectedTagsDisplay();
+            updatePrompt();
+            showNotification('欢迎使用 Comfy UI Prompt Generator v12.5 - 所有功能已恢复正常', 'success');
+        }
+
+        function loadData() {
+            console.log('正在加载数据...');
+            
+            // 加载主分类数据
+            const savedMainCategories = localStorage.getItem('comfyui_v12_5_main_categories');
+            if (savedMainCategories) {
+                settings.mainCategories = JSON.parse(savedMainCategories);
+                console.log('已加载主分类数据:', settings.mainCategories);
+            } else {
+                settings.mainCategories = JSON.parse(JSON.stringify(defaultMainCategories));
+                console.log('使用默认主分类数据');
+            }
+            
+            // 加载标签数据
+            const savedTags = localStorage.getItem('comfyui_v12_5_tags');
+            if (savedTags) {
+                settings.tags = JSON.parse(savedTags);
+                console.log('已加载标签数据:', Object.keys(settings.tags));
+            } else {
+                settings.tags = JSON.parse(JSON.stringify(defaultTags));
+                console.log('使用默认标签数据');
+            }
+            
+            // 确保所有分类都有标签数据
+            settings.mainCategories.forEach(category => {
+                if (!settings.tags[category.id]) {
+                    settings.tags[category.id] = [];
+                    console.log(`为分类 ${category.id} 创建空标签数组`);
+                }
+            });
+            
+            // 加载组内分组数据
+            const savedGroups = localStorage.getItem('comfyui_v12_5_groups');
+            if (savedGroups) {
+                settings.groups = JSON.parse(savedGroups);
+                console.log('已加载分组数据:', Object.keys(settings.groups));
+            } else {
+                settings.groups = JSON.parse(JSON.stringify(defaultGroups));
+                console.log('使用默认分组数据');
+            }
+            
+            // 确保所有分类都有分组数据
+            settings.mainCategories.forEach(category => {
+                if (!settings.groups[category.id]) {
+                    settings.groups[category.id] = [{ id: 'default', name: '默认分组' }];
+                    console.log(`为分类 ${category.id} 创建默认分组`);
+                }
+            });
+            
+            // 加载预设分类数据
+            const savedPresetCategories = localStorage.getItem('comfyui_v12_5_preset_categories');
+            if (savedPresetCategories) {
+                settings.presetCategories = JSON.parse(savedPresetCategories);
+                console.log('已加载预设分类数据:', settings.presetCategories);
+            } else {
+                settings.presetCategories = JSON.parse(JSON.stringify(defaultPresetCategories));
+                console.log('使用默认预设分类数据');
+            }
+            
+            // 加载预设数据
+            const savedPresets = localStorage.getItem('comfyui_v12_5_presets');
+            if (savedPresets) {
+                settings.presets = JSON.parse(savedPresets);
+                console.log('已加载预设数据:', Object.keys(settings.presets));
+            } else {
+                settings.presets = JSON.parse(JSON.stringify(defaultPresets));
+                console.log('使用默认预设数据');
+            }
+            
+            // 加载其他设置
+            const savedSettings = localStorage.getItem('comfyui_v12_5_settings');
+            if (savedSettings) {
+                const saved = JSON.parse(savedSettings);
+                settings.showPlusMinus = saved.showPlusMinus !== undefined ? saved.showPlusMinus : true;
+                settings.weightSymbol = saved.weightSymbol || '()';
+                settings.showDelete = saved.showDelete !== undefined ? saved.showDelete : true;
+                settings.showR18Groups = saved.showR18Groups !== undefined ? saved.showR18Groups : false;
+                settings.showNegative = saved.showNegative !== undefined ? saved.showNegative : false;
+                settings.currentTab = saved.currentTab || 'favorites';
+                settings.currentPresetTab = saved.currentPresetTab || 'anime';
+                settings.selectedTags = saved.selectedTags || [];
+                settings.favorites = saved.favorites || [];
+                console.log('已加载设置数据');
+            }
+            
+            console.log('数据加载完成');
+        }
+
+        function saveData() {
+            try {
+                localStorage.setItem('comfyui_v12_5_main_categories', JSON.stringify(settings.mainCategories));
+                localStorage.setItem('comfyui_v12_5_tags', JSON.stringify(settings.tags));
+                localStorage.setItem('comfyui_v12_5_groups', JSON.stringify(settings.groups));
+                localStorage.setItem('comfyui_v12_5_preset_categories', JSON.stringify(settings.presetCategories));
+                localStorage.setItem('comfyui_v12_5_presets', JSON.stringify(settings.presets));
+                localStorage.setItem('comfyui_v12_5_settings', JSON.stringify({
+                    showPlusMinus: settings.showPlusMinus,
+                    weightSymbol: settings.weightSymbol,
+                    showDelete: settings.showDelete,
+                    showR18Groups: settings.showR18Groups,
+                    showNegative: settings.showNegative,
+                    currentTab: settings.currentTab,
+                    currentPresetTab: settings.currentPresetTab,
+                    selectedTags: settings.selectedTags,
+                    favorites: settings.favorites
+                }));
+                console.log('数据保存成功');
+            } catch (error) {
+                console.error('数据保存失败:', error);
+                showNotification('数据保存失败，请检查浏览器存储设置', 'danger');
+            }
+        }
+
+        function initializeEventListeners() {
+            console.log('正在初始化事件监听器...');
+            
+            // 功能开关
+            const togglePlusMinusBtn = document.getElementById('togglePlusMinus');
+            const toggleDeleteBtn = document.getElementById('toggleDelete');
+            const toggleR18Btn = document.getElementById('toggleR18');
+            const clearAllBtn = document.getElementById('clearAllBtn');
+            const copyPromptBtn = document.getElementById('copyPrompt');
+            const downloadPromptBtn = document.getElementById('downloadPrompt');
+            const editModeBtn = document.getElementById('editModeBtn');
+            const manageMainCategoriesBtn = document.getElementById('manageMainCategoriesBtn');
+            const showStorageInfoBtn = document.getElementById('showStorageInfoBtn');
+            const showDataManagementBtn = document.getElementById('showDataManagementBtn');
+            const pasteAnalyzeBtn = document.getElementById('pasteAnalyzeBtn');
+            const positivePromptTextarea = document.getElementById('positivePrompt');
+            
+            // 确保所有按钮都存在
+            if (togglePlusMinusBtn) togglePlusMinusBtn.addEventListener('click', togglePlusMinus);
+            if (toggleDeleteBtn) toggleDeleteBtn.addEventListener('click', toggleDelete);
+            if (toggleR18Btn) toggleR18Btn.addEventListener('click', toggleR18Groups);
+            if (clearAllBtn) clearAllBtn.addEventListener('click', clearAll);
+            if (copyPromptBtn) copyPromptBtn.addEventListener('click', copyPrompt);
+            if (downloadPromptBtn) downloadPromptBtn.addEventListener('click', downloadPrompt);
+            if (editModeBtn) editModeBtn.addEventListener('click', toggleEditMode);
+            if (manageMainCategoriesBtn) manageMainCategoriesBtn.addEventListener('click', openMainCategoryManagementModal);
+            if (showStorageInfoBtn) showStorageInfoBtn.addEventListener('click', function() {
+                document.getElementById('storageInfoModal').classList.add('show');
+            });
+            if (showDataManagementBtn) showDataManagementBtn.addEventListener('click', function() {
+                document.getElementById('dataManagementModal').classList.add('show');
+                hideExportOptions();
+                hideImportOptions();
+            });
+            
+            // 粘贴解析功能
+            if (pasteAnalyzeBtn) pasteAnalyzeBtn.addEventListener('click', analyzePastedText);
+            if (positivePromptTextarea) {
+                positivePromptTextarea.addEventListener('paste', function(e) {
+                    setTimeout(() => analyzePastedText(), 100);
+                });
+            }
+            
+            // 模态框关闭按钮
+            const closeButtons = [
+                'closeStorageInfoBtn', 'closeDataManagementBtn', 'cancelNewPresetBtn',
+                'cancelEditPresetBtn', 'cancelEditTagBtn', 'cancelNewTagBtn',
+                'closeMainCategoryManagementBtn', 'closePresetCategoryManagementBtn'
+            ];
+            
+            closeButtons.forEach(buttonId => {
+                const button = document.getElementById(buttonId);
+                if (button) {
+                    button.addEventListener('click', function() {
+                        const modal = this.closest('.modal-overlay');
+                        if (modal) modal.classList.remove('show');
+                    });
+                }
+            });
+            
+            // 新建预设确认按钮
+            const confirmNewPresetBtn = document.getElementById('confirmNewPresetBtn');
+            if (confirmNewPresetBtn) confirmNewPresetBtn.addEventListener('click', confirmNewPreset);
+            
+            // 编辑预设确认按钮
+            const confirmEditPresetBtn = document.getElementById('confirmEditPresetBtn');
+            if (confirmEditPresetBtn) confirmEditPresetBtn.addEventListener('click', confirmEditPreset);
+            
+            // 新建标签确认按钮
+            const confirmNewTagBtn = document.getElementById('confirmNewTagBtn');
+            if (confirmNewTagBtn) confirmNewTagBtn.addEventListener('click', confirmNewTag);
+            
+            // 编辑标签确认按钮
+            const confirmEditTagBtn = document.getElementById('confirmEditTagBtn');
+            if (confirmEditTagBtn) confirmEditTagBtn.addEventListener('click', confirmEditTag);
+            
+            // 图片上传事件
+            const imageUpload = document.getElementById('imageUpload');
+            const editImageUpload = document.getElementById('editImageUpload');
+            if (imageUpload) imageUpload.addEventListener('change', handleImageUpload);
+            if (editImageUpload) editImageUpload.addEventListener('change', handleEditImageUpload);
+            
+            // 主分类管理添加按钮
+            const addNewMainCategoryBtn = document.getElementById('addNewMainCategoryBtn');
+            if (addNewMainCategoryBtn) addNewMainCategoryBtn.addEventListener('click', addNewMainCategory);
+            
+            // 主分类管理输入框回车事件
+            const newMainCategoryNameInput = document.getElementById('newMainCategoryName');
+            if (newMainCategoryNameInput) {
+                newMainCategoryNameInput.addEventListener('keypress', function(e) {
+                    if (e.key === 'Enter') addNewMainCategory();
+                });
+            }
+            
+            // 预设分类管理添加按钮
+            const addNewPresetCategoryBtn = document.getElementById('addNewPresetCategoryBtn');
+            if (addNewPresetCategoryBtn) addNewPresetCategoryBtn.addEventListener('click', addNewPresetCategory);
+            
+            // 预设分类管理输入框回车事件
+            const newPresetCategoryNameInput = document.getElementById('newPresetCategoryName');
+            if (newPresetCategoryNameInput) {
+                newPresetCategoryNameInput.addEventListener('keypress', function(e) {
+                    if (e.key === 'Enter') addNewPresetCategory();
+                });
+            }
+            
+            // 预设相关按钮
+            const newPresetBtn = document.getElementById('newPresetBtn');
+            const managePresetCategoriesBtn = document.getElementById('managePresetCategoriesBtn');
+            if (newPresetBtn) newPresetBtn.addEventListener('click', openNewPresetModal);
+            if (managePresetCategoriesBtn) managePresetCategoriesBtn.addEventListener('click', openPresetCategoryManagementModal);
+            
+            // 导入文件事件
+            const importFileInput = document.getElementById('importFileInput');
+            if (importFileInput) {
+                importFileInput.addEventListener('change', function(e) {
+                    const file = e.target.files[0];
+                    if (file) {
+                        document.getElementById('fileName').textContent = file.name;
+                        document.getElementById('fileInfo').classList.add('show');
+                        document.getElementById('importBtn').disabled = false;
+                    } else {
+                        document.getElementById('fileInfo').classList.remove('show');
+                        document.getElementById('importBtn').disabled = true;
+                    }
+                });
+            }
+            
+            // 标签分类选择事件
+            const tagCategorySelect = document.getElementById('tagCategory');
+            if (tagCategorySelect) {
+                tagCategorySelect.addEventListener('change', function() {
+                    loadGroupsForCategory(this.value);
+                });
+            }
+            
+            console.log('事件监听器初始化完成');
+        }
+
+        // 设置点击空白处关闭弹窗
+        function setupModalClickOutsideClose() {
+            document.querySelectorAll('.modal-overlay').forEach(modal => {
+                modal.addEventListener('click', function(e) {
+                    if (e.target === this) {
+                        this.classList.remove('show');
+                    }
+                });
+            });
+        }
+
+        // 数据管理功能
+        function showExportOptions() {
+            hideImportOptions();
+            const exportOptions = document.getElementById('exportOptions');
+            if (exportOptions) exportOptions.classList.remove('hidden');
+        }
+
+        function hideExportOptions() {
+            const exportOptions = document.getElementById('exportOptions');
+            if (exportOptions) exportOptions.classList.add('hidden');
+        }
+
+        function showImportOptions() {
+            hideExportOptions();
+            const importOptions = document.getElementById('importOptions');
+            if (importOptions) importOptions.classList.remove('hidden');
+            
+            const fileInfo = document.getElementById('fileInfo');
+            const importBtn = document.getElementById('importBtn');
+            const importFileInput = document.getElementById('importFileInput');
+            
+            if (fileInfo) fileInfo.classList.remove('show');
+            if (importBtn) importBtn.disabled = true;
+            if (importFileInput) importFileInput.value = '';
+        }
+
+        function hideImportOptions() {
+            const importOptions = document.getElementById('importOptions');
+            if (importOptions) importOptions.classList.add('hidden');
+        }
+
+        function exportData() {
+            try {
+                const exportData = {};
+                
+                const exportTags = document.getElementById('exportTags');
+                const exportPresets = document.getElementById('exportPresets');
+                const exportCategories = document.getElementById('exportCategories');
+                const exportSettings = document.getElementById('exportSettings');
+                
+                if (exportTags && exportTags.checked) {
+                    exportData.tags = settings.tags;
+                }
+                
+                if (exportPresets && exportPresets.checked) {
+                    exportData.presets = settings.presets;
+                }
+                
+                if (exportCategories && exportCategories.checked) {
+                    exportData.mainCategories = settings.mainCategories;
+                    exportData.groups = settings.groups;
+                    exportData.presetCategories = settings.presetCategories;
+                }
+                
+                if (exportSettings && exportSettings.checked) {
+                    exportData.settings = {
+                        showPlusMinus: settings.showPlusMinus,
+                        weightSymbol: settings.weightSymbol,
+                        showDelete: settings.showDelete,
+                        showR18Groups: settings.showR18Groups,
+                        showNegative: settings.showNegative,
+                        currentTab: settings.currentTab,
+                        currentPresetTab: settings.currentPresetTab,
+                        favorites: settings.favorites
+                    };
+                }
+                
+                const dataStr = JSON.stringify(exportData, null, 2);
+                const dataBlob = new Blob([dataStr], {type: 'application/json'});
+                const url = URL.createObjectURL(dataBlob);
+                
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = `comfyui_data_${new Date().toISOString().slice(0,10)}.json`;
+                link.click();
+                
+                URL.revokeObjectURL(url);
+                
+                showNotification('数据导出成功！文件已保存到下载文件夹', 'success');
+                hideExportOptions();
+            } catch (error) {
+                console.error('导出数据失败:', error);
+                showNotification('数据导出失败，请重试', 'danger');
+            }
+        }
+
+        function importData() {
+            const fileInput = document.getElementById('importFileInput');
+            const file = fileInput.files[0];
+            
+            if (!file) {
+                showNotification('请先选择要导入的文件', 'warning');
+                return;
+            }
+            
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const importedData = JSON.parse(e.target.result);
+                    let updateNeeded = false;
+                    
+                    if (importedData.tags) {
+                        settings.tags = importedData.tags;
+                        updateNeeded = true;
+                    }
+                    
+                    if (importedData.presets) {
+                        settings.presets = importedData.presets;
+                        updateNeeded = true;
+                    }
+                    
+                    if (importedData.mainCategories) {
+                        settings.mainCategories = importedData.mainCategories;
+                        updateNeeded = true;
+                    }
+                    
+                    if (importedData.groups) {
+                        settings.groups = importedData.groups;
+                        updateNeeded = true;
+                    }
+                    
+                    if (importedData.presetCategories) {
+                        settings.presetCategories = importedData.presetCategories;
+                        updateNeeded = true;
+                    }
+                    
+                    if (importedData.settings) {
+                        settings.showPlusMinus = importedData.settings.showPlusMinus !== undefined ? importedData.settings.showPlusMinus : settings.showPlusMinus;
+                        settings.weightSymbol = importedData.settings.weightSymbol || settings.weightSymbol;
+                        settings.showDelete = importedData.settings.showDelete !== undefined ? importedData.settings.showDelete : settings.showDelete;
+                        settings.showR18Groups = importedData.settings.showR18Groups !== undefined ? importedData.settings.showR18Groups : settings.showR18Groups;
+                        settings.showNegative = importedData.settings.showNegative !== undefined ? importedData.settings.showNegative : settings.showNegative;
+                        settings.currentTab = importedData.settings.currentTab || settings.currentTab;
+                        settings.currentPresetTab = importedData.settings.currentPresetTab || settings.currentPresetTab;
+                        settings.favorites = importedData.settings.favorites || settings.favorites;
+                        updateNeeded = true;
+                    }
+                    
+                    if (updateNeeded) {
+                        saveData();
+                        renderTagTabButtons();
+                        renderPresetTabButtons();
+                        renderTags();
+                        renderPresets();
+                        updateSelectedTagsDisplay();
+                        updatePrompt();
+                        
+                        showNotification('数据导入成功！页面已更新', 'success');
+                    } else {
+                        showNotification('导入文件中没有可更新的数据', 'warning');
+                    }
+                    
+                    hideImportOptions();
+                    
+                } catch (error) {
+                    console.error('导入数据失败:', error);
+                    showNotification('导入失败：文件格式错误或内容损坏', 'danger');
+                }
+            };
+            
+            reader.readAsText(file);
+        }
+
+        function resetAllData() {
+            if (confirm('确定要重置所有数据吗？这将删除所有自定义标签、预设和配置，恢复到初始状态。')) {
+                try {
+                    // 清除localStorage
+                    localStorage.removeItem('comfyui_v12_5_main_categories');
+                    localStorage.removeItem('comfyui_v12_5_tags');
+                    localStorage.removeItem('comfyui_v12_5_groups');
+                    localStorage.removeItem('comfyui_v12_5_preset_categories');
+                    localStorage.removeItem('comfyui_v12_5_presets');
+                    localStorage.removeItem('comfyui_v12_5_settings');
+                    
+                    // 重新加载默认数据
+                    settings.mainCategories = JSON.parse(JSON.stringify(defaultMainCategories));
+                    settings.tags = JSON.parse(JSON.stringify(defaultTags));
+                    settings.groups = JSON.parse(JSON.stringify(defaultGroups));
+                    settings.presetCategories = JSON.parse(JSON.stringify(defaultPresetCategories));
+                    settings.presets = JSON.parse(JSON.stringify(defaultPresets));
+                    settings.showPlusMinus = true;
+                    settings.weightSymbol = '()';
+                    settings.showDelete = true;
+                    settings.showR18Groups = false;
+                    settings.showNegative = false;
+                    settings.currentTab = 'favorites';
+                    settings.currentPresetTab = 'anime';
+                    settings.selectedTags = [];
+                    settings.favorites = [];
+                    
+                    saveData();
+                    renderTagTabButtons();
+                    renderPresetTabButtons();
+                    renderTags();
+                    renderPresets();
+                    updateSelectedTagsDisplay();
+                    updatePrompt();
+                    
+                    showNotification('已重置所有数据到初始状态', 'success');
+                } catch (error) {
+                    console.error('重置数据失败:', error);
+                    showNotification('数据重置失败，请重试', 'danger');
+                }
+            }
+        }
+
+        function showLocalStorageInfo() {
+            try {
+                const info = [];
+                const keys = [
+                    'comfyui_v12_5_main_categories',
+                    'comfyui_v12_5_tags', 
+                    'comfyui_v12_5_groups',
+                    'comfyui_v12_5_preset_categories',
+                    'comfyui_v12_5_presets',
+                    'comfyui_v12_5_settings'
+                ];
+                
+                keys.forEach(key => {
+                    const item = localStorage.getItem(key);
+                    if (item) {
+                        info.push(`${key}: ${(item.length / 1024).toFixed(1)} KB`);
+                    } else {
+                        info.push(`${key}: 不存在`);
+                    }
+                });
+                
+                alert('本地存储状态:\n\n' + info.join('\n'));
+            } catch (error) {
+                console.error('获取存储信息失败:', error);
+                showNotification('无法获取存储信息', 'danger');
+            }
+        }
+
+        // 渲染标签页按钮
+        function renderTagTabButtons() {
+            console.log('正在渲染标签页按钮...');
+            const container = document.getElementById('tagTabContainer');
+            if (!container) {
+                console.error('标签页容器不存在');
+                return;
+            }
+            
+            container.innerHTML = '';
+            
+            if (!settings.mainCategories || settings.mainCategories.length === 0) {
+                console.error('主分类数据为空');
+                return;
+            }
+            
+            settings.mainCategories.forEach(category => {
+                let tagCount = 0;
+                if (category.id === 'favorites') {
+                    tagCount = settings.favorites ? settings.favorites.length : 0;
+                } else {
+                    tagCount = settings.tags[category.id] ? settings.tags[category.id].length : 0;
+                }
+                
+                const isR18 = category.id === 'r18';
+                
+                const button = document.createElement('button');
+                button.className = `tab-button ${settings.currentTab === category.id ? 'active' : ''} ${isR18 ? 'r18-tab' : ''}`;
+                button.dataset.category = category.id;
+                button.innerHTML = `${category.name} <span class="badge">${tagCount}</span>`;
+                
+                button.addEventListener('click', function() {
+                    switchTagTab(category.id);
+                });
+                
+                container.appendChild(button);
+            });
+            
+            console.log('标签页按钮渲染完成');
+        }
+
+        // 渲染预设标签页按钮
+        function renderPresetTabButtons() {
+            console.log('正在渲染预设标签页按钮...');
+            const container = document.getElementById('presetTabContainer');
+            if (!container) {
+                console.error('预设标签页容器不存在');
+                return;
+            }
+            
+            container.innerHTML = '';
+            
+            settings.presetCategories.forEach(category => {
+                const presetCount = settings.presets[category.id] ? settings.presets[category.id].length : 0;
+                
+                const button = document.createElement('button');
+                button.className = `tab-button ${settings.currentPresetTab === category.id ? 'active' : ''}`;
+                button.dataset.category = category.id;
+                button.innerHTML = `${category.name} <span class="badge">${presetCount}</span>`;
+                
+                button.addEventListener('click', function() {
+                    switchPresetTab(category.id);
+                });
+                
+                container.appendChild(button);
+            });
+            
+            console.log('预设标签页按钮渲染完成');
+        }
+
+        function renderTags() {
+            console.log('正在渲染标签...');
+            const content = document.getElementById('tagsContent');
+            if (!content) {
+                console.error('标签内容容器不存在');
+                return;
+            }
+            
+            const category = settings.currentTab;
+            
+            if (category === 'favorites') {
+                renderFavoriteTags(content);
+                return;
+            }
+            
+            const tags = settings.tags[category] || [];
+            const groups = settings.groups[category] || [{ id: 'default', name: '默认分组' }];
+            
+            // 过滤R18组内分组
+            let filteredGroups = groups;
+            if (category !== 'r18' && !settings.showR18Groups) {
+                filteredGroups = groups.filter(group => group.name !== 'R18');
+            }
+            
+            const tagsByGroup = {};
+            filteredGroups.forEach(group => {
+                const groupTags = tags.filter(tag => tag.group === group.id);
+                groupTags.sort((a, b) => a.pinned ? -1 : b.pinned ? 1 : 0);
+                tagsByGroup[group.id] = groupTags;
+            });
+            
+            let html = '';
+            
+            filteredGroups.forEach(group => {
+                const groupTags = tagsByGroup[group.id] || [];
+                const pinnedCount = groupTags.filter(tag => tag.pinned).length;
+                
+                html += `
+                    <div class="mb-4">
+                        <div class="bg-gradient-to-r from-gray-100 to-gray-200 p-3 rounded-lg mb-2">
+                            <h4 class="font-semibold">${group.name} 
+                                ${pinnedCount > 0 ? `<span class="text-sm text-gray-600">(${pinnedCount}个置顶)</span>` : ''}
+                                <span class="text-sm text-gray-600">${groupTags.length}个标签</span>
+                            </h4>
+                        </div>
+                        <div class="pl-4 border-l-2 border-gray-300">
+                            <div class="tags-container">
+                                <!-- 组内新增标签按钮 -->
+                                <button class="group-add-button" 
+                                        data-category="${category}" data-group="${group.id}">
+                                    <i class="fas fa-plus"></i>
+                                    新增标签
+                                </button>
+                                
+                                ${groupTags.map(tag => `
+                                    <div class="tag-item ${isTagSelected(tag.id) ? 'ring-2 ring-yellow-400' : ''} ${tag.pinned ? 'ring-2 ring-red-500' : ''} ${isTagFavorite(tag.id) ? 'ring-2 ring-orange-500' : ''}" 
+                                         style="background: linear-gradient(135deg, ${tag.color} 0%, ${lightenColor(tag.color, 20)} 100%);"
+                                         data-tag-id="${tag.id}" 
+                                         data-category="${category}">
+                                        <div class="tag-text">${tag.text}</div>
+                                        <div class="tag-name">${tag.name}</div>
+                                        
+                                        <!-- 操作按钮 -->
+                                        <div class="tag-actions">
+                                            ${!settings.tagEditingMode ? (
+                                                `
+                                                ${tag.allowPin ? `
+                                                    <button class="btn pin-btn ${!tag.allowPin ? 'disabled' : ''}" 
+                                                            data-tag-id="${tag.id}" 
+                                                            title="${tag.pinned ? '取消置顶' : '置顶'}"
+                                                            ${!tag.allowPin ? 'disabled' : ''}>
+                                                                <i class="fas fa-thumbtack ${tag.pinned ? '' : 'fa-rotate-90'}"></i>
+                                                    </button>
+                                                ` : ''}
+                                                ${tag.allowFavorite ? `
+                                                    <button class="btn favorite-btn ${!tag.allowFavorite ? 'disabled' : ''}" 
+                                                            data-tag-id="${tag.id}" 
+                                                            title="${isTagFavorite(tag.id) ? '取消收藏' : '收藏'}"
+                                                            ${!tag.allowFavorite ? 'disabled' : ''}>
+                                                                <i class="fas fa-star ${isTagFavorite(tag.id) ? '' : 'fa-regular'}"></i>
+                                                    </button>
+                                                ` : ''}
+                                                `
+                                            ) : (
+                                                `
+                                                <button class="btn edit-tag-btn" data-tag-id="${tag.id}" data-category="${category}" title="编辑">
+                                                    <i class="fas fa-edit"></i>
+                                                </button>
+                                                <button class="btn delete-tag-btn" data-tag-id="${tag.id}" title="删除">
+                                                    <i class="fas fa-times"></i>
+                                                </button>
+                                                `
+                                            )}
+                                        </div>
+                                    </div>
+                                `).join('')}
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+            
+            content.innerHTML = html;
+            attachTagEvents();
+            console.log('标签渲染完成');
+        }
+
+        function renderFavoriteTags(content) {
+            console.log('正在渲染收藏标签...');
+            const favoriteTags = [];
+            Object.keys(settings.tags).forEach(category => {
+                const tags = settings.tags[category];
+                if (tags) {
+                    tags.forEach(tag => {
+                        if (settings.favorites && settings.favorites.includes(tag.id)) {
+                            favoriteTags.push({...tag, category});
+                        }
+                    });
+                }
+            });
+            
+            favoriteTags.sort((a, b) => a.pinned ? -1 : b.pinned ? 1 : 0);
+            
+            let html = '';
+            
+            if (favoriteTags.length === 0) {
+                html = `
+                    <div class="text-center py-6 text-gray-400">
+                        <i class="fas fa-heart text-3xl mb-2 text-pink-400"></i>
+                        <p>暂无收藏标签</p>
+                        <p class="text-sm mt-2">点击标签上的⭐按钮收藏喜欢的标签</p>
+                    </div>
+                `;
+            } else {
+                html = `
+                    <div class="tags-container">
+                        ${favoriteTags.map(tag => `
+                            <div class="tag-item ${isTagSelected(tag.id) ? 'ring-2 ring-yellow-400' : ''} ${tag.pinned ? 'ring-2 ring-red-500' : ''} ring-2 ring-orange-500" 
+                                 style="background: linear-gradient(135deg, ${tag.color} 0%, ${lightenColor(tag.color, 20)} 100%);"
+                                 data-tag-id="${tag.id}" 
+                                 data-category="${tag.category}">
+                                <div class="tag-text">${tag.text}</div>
+                                <div class="tag-name">${tag.name}</div>
+                                <div class="text-xs text-white bg-black bg-opacity-30 px-2 py-1 rounded-full mt-1 inline-block">
+                                    ${getCategoryName(tag.category)}
+                                </div>
+                                
+                                <!-- 操作按钮 -->
+                                <div class="tag-actions">
+                                    ${!settings.tagEditingMode ? (
+                                        `
+                                        ${tag.allowPin ? `
+                                            <button class="btn pin-btn ${!tag.allowPin ? 'disabled' : ''}" 
+                                                    data-tag-id="${tag.id}" 
+                                                    title="${tag.pinned ? '取消置顶' : '置顶'}"
+                                                    ${!tag.allowPin ? 'disabled' : ''}>
+                                                        <i class="fas fa-thumbtack ${tag.pinned ? '' : 'fa-rotate-90'}"></i>
+                                            </button>
+                                        ` : ''}
+                                        <button class="btn favorite-btn" data-tag-id="${tag.id}" title="取消收藏">
+                                            <i class="fas fa-star"></i>
+                                        </button>
+                                        `
+                                    ) : (
+                                        `
+                                        <button class="btn edit-tag-btn" data-tag-id="${tag.id}" data-category="${tag.category}" title="编辑">
+                                            <i class="fas fa-edit"></i>
+                                        </button>
+                                        <button class="btn delete-tag-btn" data-tag-id="${tag.id}" title="删除">
+                                            <i class="fas fa-times"></i>
+                                        </button>
+                                        `
+                                    )}
+                                </div>
+                            </div>
+                        `).join('')}
+                    </div>
+                `;
+            }
+            
+            content.innerHTML = html;
+            attachTagEvents();
+            console.log('收藏标签渲染完成');
+        }
+
+        function renderPresets() {
+            console.log('正在渲染预设...');
+            const content = document.getElementById('presetContent');
+            if (!content) {
+                console.error('预设内容容器不存在');
+                return;
+            }
+            
+            const category = settings.currentPresetTab;
+            const presets = settings.presets[category] || [];
+            
+            if (presets.length === 0) {
+                content.innerHTML = `
+                    <div class="text-center text-gray-400 py-6">
+                        <i class="fas fa-lightbulb text-3xl mb-2 text-yellow-400"></i>
+                        <p>该分类下暂无预设</p>
+                        <p class="text-sm mt-2">点击"新建预设"按钮创建新的预设</p>
+                    </div>
+                `;
+                return;
+            }
+            
+            let html = '<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">';
+            
+            presets.forEach(preset => {
+                html += `
+                    <div class="bg-white rounded-lg border-2 border-gray-200 p-4 hover:shadow-lg transition-all">
+                        <div class="flex justify-between items-start mb-2">
+                            <h4 class="font-semibold text-gray-800">${preset.name}</h4>
+                            <div class="flex gap-1">
+                                <button class="btn btn-sm btn-info edit-preset-btn" 
+                                        data-preset-id="${preset.id}" 
+                                        data-category="${category}"
+                                        title="编辑预设">
+                                    <i class="fas fa-edit"></i>
+                                </button>
+                                <button class="btn btn-sm btn-danger delete-preset-btn" 
+                                        data-preset-id="${preset.id}" 
+                                        data-category="${category}"
+                                        title="删除预设">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </div>
+                        </div>
+                        ${preset.image ? `
+                            <div class="w-full h-24 bg-gray-100 rounded-lg mb-3 overflow-hidden">
+                                <img src="${preset.image}" alt="${preset.name}" class="w-full h-full object-cover">
+                            </div>
+                        ` : ''}
+                        <p class="text-sm text-gray-600 mb-3 line-clamp-2">${preset.description}</p>
+                        <!-- 提示词区域 - 增加点击复制功能 -->
+                        <div class="text-xs text-gray-500 mb-3 bg-gray-50 p-2 rounded preset-prompt-copy" 
+                             data-prompt="${escapeHtml(preset.prompt)}"
+                             title="点击复制提示词">
+                            ${preset.prompt}
+                        </div>
+                        <div class="flex gap-2">
+                            <button class="btn btn-sm btn-primary apply-preset-btn flex-1" 
+                                    data-preset-id="${preset.id}" 
+                                    data-category="${category}">
+                                <i class="fas fa-magic mr-1"></i> 应用
+                            </button>
+                        </div>
+                    </div>
+                `;
+            });
+            
+            html += '</div>';
+            content.innerHTML = html;
+            
+            // 添加预设操作事件
+            document.querySelectorAll('.apply-preset-btn').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    const presetId = this.dataset.presetId;
+                    const category = this.dataset.category;
+                    applyPreset(presetId, category);
+                });
+            });
+            
+            document.querySelectorAll('.edit-preset-btn').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    const presetId = this.dataset.presetId;
+                    const category = this.dataset.category;
+                    editPreset(presetId, category);
+                });
+            });
+            
+            document.querySelectorAll('.delete-preset-btn').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    const presetId = this.dataset.presetId;
+                    const category = this.dataset.category;
+                    deletePreset(presetId, category);
+                });
+            });
+            
+            // 添加预设提示词点击复制事件
+            document.querySelectorAll('.preset-prompt-copy').forEach(element => {
+                element.addEventListener('click', function() {
+                    const promptText = this.dataset.prompt;
+                    copyToClipboard(promptText);
+                    showNotification('已复制预设提示词', 'success');
+                });
+            });
+            
+            console.log('预设渲染完成');
+        }
+
+        // 辅助函数：HTML转义
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // 辅助函数：复制到剪贴板
+        function copyToClipboard(text) {
+            const textarea = document.createElement('textarea');
+            textarea.value = text;
+            document.body.appendChild(textarea);
+            textarea.select();
+            document.execCommand('copy');
+            document.body.removeChild(textarea);
+        }
+
+        function attachTagEvents() {
+            console.log('正在附加标签事件...');
+            
+            // 标签点击事件
+            document.querySelectorAll('.tag-item').forEach(item => {
+                item.addEventListener('click', function(e) {
+                    if (e.target.closest('.tag-actions')) return;
+                    const tagId = this.dataset.tagId;
+                    const category = this.dataset.category;
+                    toggleTagSelection(tagId, category);
+                });
+            });
+
+            // 编辑标签按钮
+            document.querySelectorAll('.edit-tag-btn').forEach(btn => {
+                btn.addEventListener('click', function(e) {
+                    e.stopPropagation();
+                    const tagId = this.dataset.tagId;
+                    const category = this.dataset.category;
+                    openEditTagModal(tagId, category);
+                });
+            });
+
+            // 删除标签按钮
+            document.querySelectorAll('.delete-tag-btn').forEach(btn => {
+                btn.addEventListener('click', function(e) {
+                    e.stopPropagation();
+                    const tagId = this.dataset.tagId;
+                    deleteTag(tagId);
+                });
+            });
+
+            // 置顶按钮
+            document.querySelectorAll('.pin-btn').forEach(btn => {
+                btn.addEventListener('click', function(e) {
+                    e.stopPropagation();
+                    if (this.disabled) return;
+                    const tagId = this.dataset.tagId;
+                    toggleTagPin(tagId);
+                });
+            });
+
+            // 收藏按钮
+            document.querySelectorAll('.favorite-btn').forEach(btn => {
+                btn.addEventListener('click', function(e) {
+                    e.stopPropagation();
+                    if (this.disabled) return;
+                    const tagId = this.dataset.tagId;
+                    toggleTagFavorite(tagId);
+                });
+            });
+
+            // 组内新增标签按钮
+            document.querySelectorAll('.group-add-button').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    const category = this.dataset.category;
+                    const group = this.dataset.group;
+                    addNewTag(category, group);
+                });
+            });
+            
+            console.log('标签事件附加完成');
+        }
+
+        function toggleTagSelection(tagId, category) {
+            console.log(`切换标签选择: ${tagId}, ${category}`);
+            const tag = findTagById(tagId, category);
+            if (!tag) {
+                console.error(`找不到标签: ${tagId}`);
+                return;
+            }
+
+            const index = settings.selectedTags.findIndex(t => t.id === tagId);
+            
+            if (index === -1) {
+                settings.selectedTags.push({
+                    id: tag.id,
+                    text: tag.text,
+                    name: tag.name,
+                    category: category,
+                    weight: 1.0,
+                    color: tag.color
+                });
+                showNotification(`已添加标签: ${tag.name}`, 'success');
+            } else {
+                settings.selectedTags.splice(index, 1);
+                showNotification(`已移除标签: ${tag.name}`, 'info');
+            }
+
+            updateSelectedTagsDisplay();
+            updatePrompt();
+            saveData();
+            renderTags();
+        }
+
+        function updateSelectedTagsDisplay() {
+            console.log('正在更新已选择标签显示...');
+            const container = document.getElementById('selectedTags');
+            if (!container) {
+                console.error('已选择标签容器不存在');
+                return;
+            }
+            
+            if (settings.selectedTags.length === 0) {
+                container.innerHTML = '<p class="text-gray-400 text-center w-full self-center py-3">点击下方标签添加到这里...</p>';
+                return;
+            }
+
+            container.innerHTML = settings.selectedTags.map(tag => `
+                <div class="selected-tag-item" data-tag-id="${tag.id}">
+                    <div class="font-semibold text-gray-800">${tag.name}</div>
+                    <div class="text-sm text-gray-600 italic">${tag.text}</div>
+                    ${tag.weight !== 1.0 ? `<div class="text-xs text-blue-600">权重: ${tag.weight.toFixed(1)}</div>` : ''}
+                    
+                    <!-- 右上角操作按钮 -->
+                    <div class="selected-tag-actions">
+                        ${settings.showPlusMinus ? `
+                            <button class="btn btn-primary selected-tag-btn" data-tag-id="${tag.id}" data-action="decrease">
+                                <i class="fas fa-minus"></i>
+                            </button>
+                            <button class="btn btn-primary selected-tag-btn" data-tag-id="${tag.id}" data-action="increase">
+                                <i class="fas fa-plus"></i>
+                            </button>
+                        ` : ''}
+                        ${settings.showDelete ? `
+                            <button class="btn btn-danger selected-tag-btn" data-tag-id="${tag.id}" data-action="delete">
+                                <i class="fas fa-times"></i>
+                            </button>
+                        ` : ''}
+                    </div>
+                </div>
+            `).join('');
+
+            // 添加事件监听
+            document.querySelectorAll('.selected-tag-btn').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    const tagId = this.dataset.tagId;
+                    const action = this.dataset.action;
+                    
+                    if (action === 'increase') {
+                        changeTagWeight(tagId, 0.1);
+                    } else if (action === 'decrease') {
+                        changeTagWeight(tagId, -0.1);
+                    } else if (action === 'delete') {
+                        removeTagFromSelection(tagId);
+                    }
+                });
+            });
+            
+            console.log('已选择标签显示更新完成');
+        }
+
+        // 权重格式：(text:weight)
+        function updatePrompt() {
+            console.log('正在更新提示词...');
+            const prompt = document.getElementById('positivePrompt');
+            if (!prompt) {
+                console.error('提示词文本框不存在');
+                return;
+            }
+            
+            let promptText = '';
+
+            const categoryOrder = settings.mainCategories.map(cat => cat.id);
+            const sortedTags = [...settings.selectedTags].sort((a, b) => {
+                const aIndex = categoryOrder.indexOf(a.category);
+                const bIndex = categoryOrder.indexOf(b.category);
+                return aIndex - bIndex;
+            });
+
+            promptText = sortedTags.map(tag => {
+                if (tag.weight !== 1.0) {
+                    return `${settings.weightSymbol[0]}${tag.text}:${tag.weight.toFixed(1)}${settings.weightSymbol[1]}`;
+                }
+                return tag.text;
+            }).join(', ');
+
+            prompt.value = promptText;
+            console.log('提示词更新完成');
+        }
+
+        // 解析结果：按英文逗号区分标签
+        function analyzePastedText() {
+            console.log('正在解析粘贴的文本...');
+            const promptText = document.getElementById('positivePrompt').value.trim();
+            if (!promptText) {
+                showNotification('请先粘贴提示词内容', 'warning');
+                return;
+            }
+
+            const container = document.getElementById('parsedTagsContainer');
+            const list = document.getElementById('parsedTagsList');
+            if (!container || !list) {
+                console.error('解析结果容器不存在');
+                return;
+            }
+            
+            // 清空之前的解析结果
+            list.innerHTML = '';
+            container.classList.remove('hidden');
+
+            // 按照英文逗号分割文本
+            const tagParts = promptText.split(',').map(part => part.trim());
+            
+            settings.parsedTags = [];
+            tagParts.forEach(tagPart => {
+                if (!tagPart) return;
+
+                // 清理标签部分，移除括号和其他符号
+                const cleanText = tagPart.replace(/[(){}[\]]/g, '').trim().toLowerCase();
+                if (!cleanText || /^[0-9.]+$/.test(cleanText)) return;
+
+                let existingTag = null;
+                let existingCategory = null;
+                
+                // 查找是否存在这个标签
+                for (const category in settings.tags) {
+                    const tag = settings.tags[category].find(t => 
+                        t.text.toLowerCase() === cleanText || 
+                        t.name.toLowerCase() === cleanText
+                    );
+                    if (tag) {
+                        existingTag = tag;
+                        existingCategory = category;
+                        break;
+                    }
+                }
+
+                const parsedTag = {
+                    text: cleanText,
+                    displayText: tagPart,
+                    isExisting: !!existingTag,
+                    existingTag: existingTag,
+                    existingCategory: existingCategory
+                };
+                
+                settings.parsedTags.push(parsedTag);
+
+                // 创建显示标签
+                const tagElement = document.createElement('span');
+                tagElement.className = `parsed-tag ${existingTag ? 'existing' : 'new'}`;
+                tagElement.textContent = tagPart;
+                tagElement.title = existingTag ? `已存在: ${existingTag.name}` : '点击添加新标签';
+                
+                // 点击事件
+                tagElement.addEventListener('click', function() {
+                    if (existingTag) {
+                        // 如果是已存在的标签，直接添加到选择
+                        toggleTagSelection(existingTag.id, existingCategory);
+                    } else {
+                        // 如果是新标签，打开编辑模态框
+                        openEditNewTagModal(cleanText);
+                    }
+                });
+                
+                list.appendChild(tagElement);
+            });
+
+            showNotification(`解析完成，找到 ${settings.parsedTags.length} 个标签`, 'success');
+            console.log('文本解析完成');
+        }
+
+        // 其他辅助函数
+        function togglePlusMinus() {
+            settings.showPlusMinus = !settings.showPlusMinus;
+            const btn = document.getElementById('togglePlusMinus');
+            if (btn) {
+                btn.innerHTML = settings.showPlusMinus ? '<i class="fas fa-plus-minus"></i> 加减号' : '<i class="fas fa-plus-minus"></i> 加减号';
+            }
+            updateSelectedTagsDisplay();
+            saveData();
+        }
+
+        function toggleDelete() {
+            settings.showDelete = !settings.showDelete;
+            const btn = document.getElementById('toggleDelete');
+            if (btn) {
+                btn.innerHTML = settings.showDelete ? '<i class="fas fa-trash"></i> 删除X' : '<i class="fas fa-trash"></i> 删除X';
+            }
+            updateSelectedTagsDisplay();
+            saveData();
+        }
+
+        function toggleR18Groups() {
+            settings.showR18Groups = !settings.showR18Groups;
+            const btn = document.getElementById('toggleR18');
+            if (btn) {
+                btn.innerHTML = settings.showR18Groups ? '<i class="fas fa-eye"></i> R18On' : '<i class="fas fa-eye-slash"></i> R18Off';
+                btn.className = settings.showR18Groups ? 'btn btn-success' : 'btn btn-danger';
+            }
+            renderTags();
+            saveData();
+            showNotification(settings.showR18Groups ? '已开启R18内容显示' : '已关闭R18内容显示', settings.showR18Groups ? 'r18' : 'info');
+        }
+
+        function clearAll() {
+            if (confirm('确定要清空所有已选择的标签吗？')) {
+                settings.selectedTags = [];
+                updateSelectedTagsDisplay();
+                updatePrompt();
+                saveData();
+                showNotification('已清空所有已选择的标签', 'success');
+            }
+        }
+
+        function copyPrompt() {
+            const prompt = document.getElementById('positivePrompt');
+            if (!prompt) {
+                showNotification('提示词文本框不存在', 'danger');
+                return;
+            }
+            
+            prompt.select();
+            document.execCommand('copy');
+            showNotification('提示词已复制到剪贴板', 'success');
+        }
+
+        function downloadPrompt() {
+            const prompt = document.getElementById('positivePrompt');
+            if (!prompt) {
+                showNotification('提示词文本框不存在', 'danger');
+                return;
+            }
+            
+            const promptText = prompt.value;
+            const blob = new Blob([promptText], { type: 'text/plain' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'prompt.txt';
+            a.click();
+            URL.revokeObjectURL(url);
+            showNotification('提示词已下载', 'success');
+        }
+
+        function toggleEditMode() {
+            settings.tagEditingMode = !settings.tagEditingMode;
+            const btn = document.getElementById('editModeBtn');
+            if (btn) {
+                if (settings.tagEditingMode) {
+                    btn.innerHTML = '<i class="fas fa-times"></i> 退出编辑';
+                    btn.classList.remove('btn-primary');
+                    btn.classList.add('btn-danger');
+                    showNotification('已进入编辑模式，可以编辑和删除标签', 'info');
+                } else {
+                    btn.innerHTML = '<i class="fas fa-edit"></i> 编辑模式';
+                    btn.classList.remove('btn-danger');
+                    btn.classList.add('btn-primary');
+                    showNotification('已退出编辑模式', 'info');
+                }
+            }
+            renderTags();
+        }
+
+        function findTagById(tagId, category = null) {
+            if (category) {
+                const tags = settings.tags[category] || [];
+                return tags.find(tag => tag.id === tagId);
+            }
+            
+            for (const cat in settings.tags) {
+                const tags = settings.tags[cat];
+                if (tags) {
+                    const tag = tags.find(t => t.id === tagId);
+                    if (tag) return tag;
+                }
+            }
+            return null;
+        }
+
+        function isTagSelected(tagId) {
+            return settings.selectedTags.some(tag => tag.id === tagId);
+        }
+
+        function isTagFavorite(tagId) {
+            return settings.favorites && settings.favorites.includes(tagId);
+        }
+
+        function toggleTagFavorite(tagId) {
+            if (!settings.favorites) settings.favorites = [];
+            
+            const index = settings.favorites.indexOf(tagId);
+            if (index === -1) {
+                settings.favorites.push(tagId);
+                showNotification('标签已添加到收藏', 'success');
+            } else {
+                settings.favorites.splice(index, 1);
+                showNotification('标签已从收藏中移除', 'info');
+            }
+            saveData();
+            renderTags();
+        }
+
+        function toggleTagPin(tagId) {
+            for (const category in settings.tags) {
+                const tags = settings.tags[category];
+                if (tags) {
+                    const tag = tags.find(t => t.id === tagId);
+                    if (tag) {
+                        tag.pinned = !tag.pinned;
+                        saveData();
+                        renderTags();
+                        showNotification(tag.pinned ? '标签已置顶' : '标签已取消置顶', 'success');
+                        return;
+                    }
+                }
+            }
+        }
+
+        function deleteTag(tagId) {
+            for (const category in settings.tags) {
+                const tags = settings.tags[category];
+                if (tags) {
+                    const index = tags.findIndex(tag => tag.id === tagId);
+                    if (index !== -1) {
+                        const tagName = tags[index].name;
+                        if (confirm(`确定要删除标签 "${tagName}" 吗？`)) {
+                            tags.splice(index, 1);
+                            
+                            // 从收藏中移除
+                            if (settings.favorites) {
+                                settings.favorites = settings.favorites.filter(id => id !== tagId);
+                            }
+                            
+                            // 从已选择中移除
+                            settings.selectedTags = settings.selectedTags.filter(tag => tag.id !== tagId);
+                            
+                            saveData();
+                            renderTags();
+                            updateSelectedTagsDisplay();
+                            updatePrompt();
+                            showNotification(`已删除标签: ${tagName}`, 'success');
+                        }
+                        return;
+                    }
+                }
+            }
+        }
+
+        function changeTagWeight(tagId, delta) {
+            const tag = settings.selectedTags.find(t => t.id === tagId);
+            if (tag) {
+                tag.weight = Math.max(0.1, Math.min(2.0, tag.weight + delta));
+                updateSelectedTagsDisplay();
+                updatePrompt();
+                saveData();
+            }
+        }
+
+        function removeTagFromSelection(tagId) {
+            const index = settings.selectedTags.findIndex(t => t.id === tagId);
+            if (index !== -1) {
+                const tagName = settings.selectedTags[index].name;
+                settings.selectedTags.splice(index, 1);
+                updateSelectedTagsDisplay();
+                updatePrompt();
+                saveData();
+                showNotification(`已移除标签: ${tagName}`, 'info');
+            }
+        }
+
+        function getCategoryName(categoryId) {
+            const category = settings.mainCategories.find(cat => cat.id === categoryId);
+            return category ? category.name : '未知';
+        }
+
+        function getCategoryColor(categoryId) {
+            const category = settings.mainCategories.find(cat => cat.id === categoryId);
+            return category ? category.color : '#667eea';
+        }
+
+        function getRandomColor() {
+            const colors = [
+                '#667eea', '#764ba2', '#f093fb', '#f5576c', '#4facfe',
+                '#00f2fe', '#43e97b', '#38f9d7', '#4facfe', '#00f2fe'
+            ];
+            return colors[Math.floor(Math.random() * colors.length)];
+        }
+
+        function lightenColor(color, percent) {
+            const num = parseInt(color.replace("#", ""), 16);
+            const amt = Math.round(2.55 * percent);
+            const R = (num >> 16) + amt;
+            const G = (num >> 8 & 0x00FF) + amt;
+            const B = (num & 0x0000FF) + amt;
+            return "#" + (
+                0x1000000 +
+                (R < 255 ? (R < 1 ? 0 : R) : 255) * 0x10000 +
+                (G < 255 ? (G < 1 ? 0 : G) : 255) * 0x100 +
+                (B < 255 ? (B < 1 ? 0 : B) : 255)
+            ).toString(16).slice(1);
+        }
+
+        function switchTagTab(categoryId) {
+            settings.currentTab = categoryId;
+            
+            document.querySelectorAll('#tagTabContainer .tab-button').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            const activeBtn = document.querySelector(`#tagTabContainer .tab-button[data-category="${categoryId}"]`);
+            if (activeBtn) {
+                activeBtn.classList.add('active');
+            }
+
+            renderTags();
+            saveData();
+        }
+
+        function switchPresetTab(categoryId) {
+            settings.currentPresetTab = categoryId;
+            
+            document.querySelectorAll('#presetTabContainer .tab-button').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            const activeBtn = document.querySelector(`#presetTabContainer .tab-button[data-category="${categoryId}"]`);
+            if (activeBtn) {
+                activeBtn.classList.add('active');
+            }
+
+            renderPresets();
+            saveData();
+        }
+
+        function getPresetCategoryName(categoryId) {
+            const category = settings.presetCategories.find(cat => cat.id === categoryId);
+            return category ? category.name : '未知';
+        }
+
+        function showNotification(message, type = 'info') {
+            const notification = document.getElementById('notification');
+            if (!notification) return;
+            
+            notification.textContent = message;
+            notification.className = `notification ${type}`;
+            notification.classList.add('show');
+            
+            setTimeout(() => {
+                notification.classList.remove('show');
+            }, 3000);
+        }
+
+        // 主分类管理相关函数
+        function openMainCategoryManagementModal() {
+            const modal = document.getElementById('mainCategoryManagementModal');
+            if (modal) {
+                renderMainCategoryList();
+                modal.classList.add('show');
+            }
+        }
+
+        function closeMainCategoryManagementModal() {
+            const modal = document.getElementById('mainCategoryManagementModal');
+            if (modal) modal.classList.remove('show');
+        }
+
+        function renderMainCategoryList() {
+            const container = document.getElementById('mainCategoryList');
+            if (!container) return;
+            
+            container.innerHTML = '';
+            
+            settings.mainCategories.forEach((category, index) => {
+                const categoryItem = document.createElement('div');
+                categoryItem.className = 'flex items-center justify-between p-3 bg-gray-50 rounded-lg';
+                categoryItem.innerHTML = `
+                    <div class="flex items-center">
+                        <div class="w-4 h-4 rounded-full mr-3" style="background-color: ${category.color}"></div>
+                        <span class="${category.isSystem ? 'font-semibold text-blue-600' : 'text-gray-800'}">
+                            ${category.name} ${category.isSystem ? '(系统分类)' : ''}
+                        </span>
+                        <span class="ml-2 text-xs text-gray-500">${settings.tags[category.id] ? settings.tags[category.id].length : 0}个标签</span>
+                    </div>
+                    <div class="flex gap-1">
+                        <button class="btn btn-sm btn-info edit-main-category-btn" 
+                                data-index="${index}" 
+                                title="编辑分类">
+                            <i class="fas fa-edit"></i>
+                        </button>
+                        ${!category.isSystem ? `
+                            <button class="btn btn-sm btn-danger delete-main-category-btn" 
+                                    data-index="${index}" 
+                                    title="删除分类">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        ` : ''}
+                        ${index > 0 ? `
+                            <button class="btn btn-sm btn-secondary move-up-main-category-btn" 
+                                    data-index="${index}" 
+                                    title="上移">
+                                <i class="fas fa-arrow-up"></i>
+                            </button>
+                        ` : ''}
+                        ${index < settings.mainCategories.length - 1 ? `
+                            <button class="btn btn-sm btn-secondary move-down-main-category-btn" 
+                                    data-index="${index}" 
+                                    title="下移">
+                                <i class="fas fa-arrow-down"></i>
+                            </button>
+                        ` : ''}
+                    </div>
+                `;
+                container.appendChild(categoryItem);
+            });
+            
+            // 添加事件监听
+            document.querySelectorAll('.edit-main-category-btn').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    const index = parseInt(this.dataset.index);
+                    editMainCategory(index);
+                });
+            });
+            
+            document.querySelectorAll('.delete-main-category-btn').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    const index = parseInt(this.dataset.index);
+                    deleteMainCategory(index);
+                });
+            });
+            
+            document.querySelectorAll('.move-up-main-category-btn').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    const index = parseInt(this.dataset.index);
+                    moveMainCategoryUp(index);
+                });
+            });
+            
+            document.querySelectorAll('.move-down-main-category-btn').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    const index = parseInt(this.dataset.index);
+                    moveMainCategoryDown(index);
+                });
+            });
+        }
+
+        function addNewMainCategory() {
+            const nameInput = document.getElementById('newMainCategoryName');
+            if (!nameInput) return;
+            
+            const name = nameInput.value.trim();
+            if (!name) {
+                showNotification('请输入分类名称', 'warning');
+                return;
+            }
+            
+            const newCategory = {
+                id: 'custom_' + Date.now(),
+                name: name,
+                color: getRandomColor(),
+                isSystem: false
+            };
+            
+            // 添加到最前面
+            settings.mainCategories.unshift(newCategory);
+            
+            // 初始化标签和分组
+            if (!settings.tags[newCategory.id]) {
+                settings.tags[newCategory.id] = [];
+            }
+            
+            if (!settings.groups[newCategory.id]) {
+                settings.groups[newCategory.id] = [{ id: 'default', name: '默认分组' }];
+            }
+            
+            nameInput.value = '';
+            saveData();
+            renderMainCategoryList();
+            renderTagTabButtons();
+            showNotification(`已添加新分类: ${name}`, 'success');
+        }
+
+        function editMainCategory(index) {
+            const category = settings.mainCategories[index];
+            const newName = prompt('请输入新的分类名称:', category.name);
+            if (newName && newName.trim()) {
+                category.name = newName.trim();
+                saveData();
+                renderMainCategoryList();
+                renderTagTabButtons();
+                showNotification('分类名称已更新', 'success');
+            }
+        }
+
+        function deleteMainCategory(index) {
+            const category = settings.mainCategories[index];
+            if (confirm(`确定要删除分类 "${category.name}" 吗？此操作将删除该分类下的所有标签。`)) {
+                // 删除标签和分组
+                delete settings.tags[category.id];
+                delete settings.groups[category.id];
+                
+                // 从收藏中移除该分类的标签
+                if (settings.favorites) {
+                    settings.favorites = settings.favorites.filter(tagId => {
+                        let exists = false;
+                        for (const cat in settings.tags) {
+                            if (settings.tags[cat].some(tag => tag.id === tagId)) {
+                                exists = true;
+                                break;
+                            }
+                        }
+                        return exists;
+                    });
+                }
+                
+                settings.mainCategories.splice(index, 1);
+                saveData();
+                renderMainCategoryList();
+                renderTagTabButtons();
+                showNotification(`已删除分类: ${category.name}`, 'success');
+            }
+        }
+
+        function moveMainCategoryUp(index) {
+            if (index > 0) {
+                [settings.mainCategories[index], settings.mainCategories[index - 1]] = 
+                [settings.mainCategories[index - 1], settings.mainCategories[index]];
+                saveData();
+                renderMainCategoryList();
+                renderTagTabButtons();
+            }
+        }
+
+        function moveMainCategoryDown(index) {
+            if (index < settings.mainCategories.length - 1) {
+                [settings.mainCategories[index], settings.mainCategories[index + 1]] = 
+                [settings.mainCategories[index + 1], settings.mainCategories[index]];
+                saveData();
+                renderMainCategoryList();
+                renderTagTabButtons();
+            }
+        }
+
+        // 预设分类管理相关函数
+        function openPresetCategoryManagementModal() {
+            const modal = document.getElementById('presetCategoryManagementModal');
+            if (modal) {
+                renderPresetCategoryList();
+                modal.classList.add('show');
+            }
+        }
+
+        function closePresetCategoryManagementModal() {
+            const modal = document.getElementById('presetCategoryManagementModal');
+            if (modal) modal.classList.remove('show');
+        }
+
+        function renderPresetCategoryList() {
+            const container = document.getElementById('presetCategoryList');
+            if (!container) return;
+            
+            container.innerHTML = '';
+            
+            settings.presetCategories.forEach((category, index) => {
+                const categoryItem = document.createElement('div');
+                categoryItem.className = 'flex items-center justify-between p-3 bg-gray-50 rounded-lg';
+                categoryItem.innerHTML = `
+                    <div class="flex items-center">
+                        <span class="${category.isSystem ? 'font-semibold text-blue-600' : 'text-gray-800'}">
+                            ${category.name} ${category.isSystem ? '(系统分类)' : ''}
+                        </span>
+                        <span class="ml-2 text-xs text-gray-500">${settings.presets[category.id] ? settings.presets[category.id].length : 0}个预设</span>
+                    </div>
+                    <div class="flex gap-1">
+                        <button class="btn btn-sm btn-info edit-preset-category-btn" 
+                                data-index="${index}" 
+                                title="编辑分类">
+                            <i class="fas fa-edit"></i>
+                        </button>
+                        ${!category.isSystem ? `
+                            <button class="btn btn-sm btn-danger delete-preset-category-btn" 
+                                    data-index="${index}" 
+                                    title="删除分类">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        ` : ''}
+                        ${index > 0 ? `
+                            <button class="btn btn-sm btn-secondary move-up-preset-category-btn" 
+                                    data-index="${index}" 
+                                    title="上移">
+                                <i class="fas fa-arrow-up"></i>
+                            </button>
+                        ` : ''}
+                        ${index < settings.presetCategories.length - 1 ? `
+                            <button class="btn btn-sm btn-secondary move-down-preset-category-btn" 
+                                    data-index="${index}" 
+                                    title="下移">
+                                <i class="fas fa-arrow-down"></i>
+                            </button>
+                        ` : ''}
+                    </div>
+                `;
+                container.appendChild(categoryItem);
+            });
+            
+            // 添加事件监听
+            document.querySelectorAll('.edit-preset-category-btn').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    const index = parseInt(this.dataset.index);
+                    editPresetCategory(index);
+                });
+            });
+            
+            document.querySelectorAll('.delete-preset-category-btn').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    const index = parseInt(this.dataset.index);
+                    deletePresetCategory(index);
+                });
+            });
+            
+            document.querySelectorAll('.move-up-preset-category-btn').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    const index = parseInt(this.dataset.index);
+                    movePresetCategoryUp(index);
+                });
+            });
+            
+            document.querySelectorAll('.move-down-preset-category-btn').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    const index = parseInt(this.dataset.index);
+                    movePresetCategoryDown(index);
+                });
+            });
+        }
+
+        function addNewPresetCategory() {
+            const nameInput = document.getElementById('newPresetCategoryName');
+            if (!nameInput) return;
+            
+            const name = nameInput.value.trim();
+            if (!name) {
+                showNotification('请输入预设分类名称', 'warning');
+                return;
+            }
+            
+            const newCategory = {
+                id: 'preset_custom_' + Date.now(),
+                name: name,
+                isSystem: false
+            };
+            
+            // 添加到最前面
+            settings.presetCategories.unshift(newCategory);
+            
+            // 初始化预设
+            if (!settings.presets[newCategory.id]) {
+                settings.presets[newCategory.id] = [];
+            }
+            
+            nameInput.value = '';
+            saveData();
+            renderPresetCategoryList();
+            renderPresetTabButtons();
+            showNotification(`已添加新预设分类: ${name}`, 'success');
+        }
+
+        function editPresetCategory(index) {
+            const category = settings.presetCategories[index];
+            const newName = prompt('请输入新的预设分类名称:', category.name);
+            if (newName && newName.trim()) {
+                category.name = newName.trim();
+                saveData();
+                renderPresetCategoryList();
+                renderPresetTabButtons();
+                showNotification('预设分类名称已更新', 'success');
+            }
+        }
+
+        function deletePresetCategory(index) {
+            const category = settings.presetCategories[index];
+            if (confirm(`确定要删除预设分类 "${category.name}" 吗？此操作将删除该分类下的所有预设。`)) {
+                // 删除预设
+                delete settings.presets[category.id];
+                
+                settings.presetCategories.splice(index, 1);
+                saveData();
+                renderPresetCategoryList();
+                renderPresetTabButtons();
+                showNotification(`已删除预设分类: ${category.name}`, 'success');
+            }
+        }
+
+        function movePresetCategoryUp(index) {
+            if (index > 0) {
+                [settings.presetCategories[index], settings.presetCategories[index - 1]] = 
+                [settings.presetCategories[index - 1], settings.presetCategories[index]];
+                saveData();
+                renderPresetCategoryList();
+                renderPresetTabButtons();
+            }
+        }
+
+        function movePresetCategoryDown(index) {
+            if (index < settings.presetCategories.length - 1) {
+                [settings.presetCategories[index], settings.presetCategories[index + 1]] = 
+                [settings.presetCategories[index + 1], settings.presetCategories[index]];
+                saveData();
+                renderPresetCategoryList();
+                renderPresetTabButtons();
+            }
+        }
+
+        // 标签编辑相关函数
+        function addNewTag(category, group) {
+            const englishText = prompt('请输入标签的英文文本:');
+            if (!englishText || !englishText.trim()) {
+                showNotification('请输入有效的英文文本', 'warning');
+                return;
+            }
+            
+            const chineseName = prompt('请输入标签的中文名称:');
+            if (!chineseName || !chineseName.trim()) {
+                showNotification('请输入有效的中文名称', 'warning');
+                return;
+            }
+            
+            const newTag = {
+                id: 'tag_' + Date.now(),
+                text: englishText.trim(),
+                name: chineseName.trim(),
+                color: getCategoryColor(category),
+                group: group,
+                pinned: false,
+                favorite: false,
+                allowPin: true,
+                allowFavorite: true
+            };
+            
+            if (!settings.tags[category]) {
+                settings.tags[category] = [];
+            }
+            
+            settings.tags[category].push(newTag);
+            saveData();
+            renderTags();
+            showNotification(`已添加新标签: ${chineseName}`, 'success');
+        }
+
+        function openEditTagModal(tagId, category) {
+            const tag = findTagById(tagId, category);
+            if (!tag) {
+                showNotification('找不到指定的标签', 'danger');
+                return;
+            }
+            
+            const englishTextInput = document.getElementById('editTagEnglishText');
+            const chineseNameInput = document.getElementById('editTagChineseName');
+            const tagGroupSelect = document.getElementById('editTagGroup');
+            const editTagIdInput = document.getElementById('editTagId');
+            const editTagCategoryInput = document.getElementById('editTagCategory');
+            
+            if (!englishTextInput || !chineseNameInput || !tagGroupSelect || !editTagIdInput || !editTagCategoryInput) {
+                showNotification('模态框元素缺失', 'danger');
+                return;
+            }
+            
+            englishTextInput.value = tag.text;
+            chineseNameInput.value = tag.name;
+            editTagIdInput.value = tag.id;
+            editTagCategoryInput.value = category;
+            
+            // 加载分组选项
+            tagGroupSelect.innerHTML = '';
+            const groups = settings.groups[category] || [{ id: 'default', name: '默认分组' }];
+            groups.forEach(group => {
+                const option = document.createElement('option');
+                option.value = group.id;
+                option.textContent = group.name;
+                if (group.id === tag.group) {
+                    option.selected = true;
+                }
+                tagGroupSelect.appendChild(option);
+            });
+            
+            const modal = document.getElementById('editTagModal');
+            if (modal) modal.classList.add('show');
+        }
+
+        function confirmEditTag() {
+            const englishTextInput = document.getElementById('editTagEnglishText');
+            const chineseNameInput = document.getElementById('editTagChineseName');
+            const tagGroupSelect = document.getElementById('editTagGroup');
+            const editTagIdInput = document.getElementById('editTagId');
+            const editTagCategoryInput = document.getElementById('editTagCategory');
+            
+            if (!englishTextInput || !chineseNameInput || !tagGroupSelect || !editTagIdInput || !editTagCategoryInput) {
+                showNotification('模态框元素缺失', 'danger');
+                return;
+            }
+            
+            const tagId = editTagIdInput.value;
+            const category = editTagCategoryInput.value;
+            const englishText = englishTextInput.value.trim();
+            const chineseName = chineseNameInput.value.trim();
+            const group = tagGroupSelect.value;
+            
+            if (!englishText || !chineseName) {
+                showNotification('请输入完整的标签信息', 'warning');
+                return;
+            }
+            
+            const tag = findTagById(tagId, category);
+            if (!tag) {
+                showNotification('找不到指定的标签', 'danger');
+                return;
+            }
+            
+            tag.text = englishText;
+            tag.name = chineseName;
+            tag.group = group;
+            
+            saveData();
+            renderTags();
+            updateSelectedTagsDisplay();
+            updatePrompt();
+            
+            const modal = document.getElementById('editTagModal');
+            if (modal) modal.classList.remove('show');
+            
+            showNotification('标签已更新', 'success');
+        }
+
+        function openEditNewTagModal(tagText) {
+            const newTagTextInput = document.getElementById('newTagText');
+            const englishTextInput = document.getElementById('tagEnglishText');
+            const chineseNameInput = document.getElementById('tagChineseName');
+            const tagCategorySelect = document.getElementById('tagCategory');
+            const tagGroupSelect = document.getElementById('tagGroup');
+            
+            if (!newTagTextInput || !englishTextInput || !chineseNameInput || !tagCategorySelect || !tagGroupSelect) {
+                showNotification('模态框元素缺失', 'danger');
+                return;
+            }
+            
+            newTagTextInput.value = tagText;
+            englishTextInput.value = tagText;
+            chineseNameInput.value = '';
+            
+            // 加载分类选项
+            tagCategorySelect.innerHTML = '';
+            settings.mainCategories.forEach(category => {
+                // 排除收藏和R18分类
+                if (category.id !== 'favorites' && category.id !== 'r18') {
+                    const option = document.createElement('option');
+                    option.value = category.id;
+                    option.textContent = category.name;
+                    tagCategorySelect.appendChild(option);
+                }
+            });
+            
+            // 加载默认分组
+            loadGroupsForCategory(tagCategorySelect.value);
+            
+            const modal = document.getElementById('editNewTagModal');
+            if (modal) modal.classList.add('show');
+        }
+
+        function loadGroupsForCategory(categoryId) {
+            const tagGroupSelect = document.getElementById('tagGroup');
+            if (!tagGroupSelect) return;
+            
+            tagGroupSelect.innerHTML = '';
+            const groups = settings.groups[categoryId] || [{ id: 'default', name: '默认分组' }];
+            groups.forEach(group => {
+                const option = document.createElement('option');
+                option.value = group.id;
+                option.textContent = group.name;
+                tagGroupSelect.appendChild(option);
+            });
+        }
+
+        function confirmNewTag() {
+            const newTagTextInput = document.getElementById('newTagText');
+            const englishTextInput = document.getElementById('tagEnglishText');
+            const chineseNameInput = document.getElementById('tagChineseName');
+            const tagCategorySelect = document.getElementById('tagCategory');
+            const tagGroupSelect = document.getElementById('tagGroup');
+            
+            if (!newTagTextInput || !englishTextInput || !chineseNameInput || !tagCategorySelect || !tagGroupSelect) {
+                showNotification('模态框元素缺失', 'danger');
+                return;
+            }
+            
+            const englishText = englishTextInput.value.trim();
+            const chineseName = chineseNameInput.value.trim();
+            const category = tagCategorySelect.value;
+            const group = tagGroupSelect.value;
+            
+            if (!englishText || !chineseName) {
+                showNotification('请输入完整的标签信息', 'warning');
+                return;
+            }
+            
+            const newTag = {
+                id: 'tag_' + Date.now(),
+                text: englishText,
+                name: chineseName,
+                color: getCategoryColor(category),
+                group: group,
+                pinned: false,
+                favorite: false,
+                allowPin: true,
+                allowFavorite: true
+            };
+            
+            if (!settings.tags[category]) {
+                settings.tags[category] = [];
+            }
+            
+            settings.tags[category].push(newTag);
+            saveData();
+            renderTags();
+            
+            // 添加到已选择标签
+            settings.selectedTags.push({
+                id: newTag.id,
+                text: newTag.text,
+                name: newTag.name,
+                category: category,
+                weight: 1.0,
+                color: newTag.color
+            });
+            
+            updateSelectedTagsDisplay();
+            updatePrompt();
+            
+            const modal = document.getElementById('editNewTagModal');
+            if (modal) modal.classList.remove('show');
+            
+            showNotification(`已添加新标签: ${chineseName}`, 'success');
+        }
+
+        // 预设相关函数
+        function openNewPresetModal() {
+            const presetPromptTextarea = document.getElementById('presetPrompt');
+            const positivePromptTextarea = document.getElementById('positivePrompt');
+            
+            if (presetPromptTextarea && positivePromptTextarea) {
+                presetPromptTextarea.value = positivePromptTextarea.value;
+            }
+            
+            const modal = document.getElementById('newPresetModal');
+            if (modal) modal.classList.add('show');
+        }
+
+        function closeNewPresetModal() {
+            const modal = document.getElementById('newPresetModal');
+            if (modal) modal.classList.remove('show');
+        }
+
+        function confirmNewPreset() {
+            const presetNameInput = document.getElementById('presetName');
+            const presetPromptTextarea = document.getElementById('presetPrompt');
+            const presetDescriptionTextarea = document.getElementById('presetDescription');
+            const presetCategorySelect = document.getElementById('presetCategory');
+            
+            if (!presetNameInput || !presetPromptTextarea || !presetCategorySelect) {
+                showNotification('模态框元素缺失', 'danger');
+                return;
+            }
+            
+            const name = presetNameInput.value.trim();
+            const prompt = presetPromptTextarea.value.trim();
+            const description = presetDescriptionTextarea ? presetDescriptionTextarea.value.trim() : '';
+            const category = presetCategorySelect.value;
+            
+            if (!name || !prompt) {
+                showNotification('请输入预设名称和提示词', 'warning');
+                return;
+            }
+            
+            const newPreset = {
+                id: 'preset_' + Date.now(),
+                name: name,
+                prompt: prompt,
+                description: description,
+                image: '',
+                category: category
+            };
+            
+            if (!settings.presets[category]) {
+                settings.presets[category] = [];
+            }
+            
+            settings.presets[category].push(newPreset);
+            saveData();
+            renderPresets();
+            
+            closeNewPresetModal();
+            showNotification(`已创建新预设: ${name}`, 'success');
+        }
+
+        function editPreset(presetId, category) {
+            const presets = settings.presets[category] || [];
+            const preset = presets.find(p => p.id === presetId);
+            
+            if (!preset) {
+                showNotification('找不到指定的预设', 'danger');
+                return;
+            }
+            
+            const editPresetIdInput = document.getElementById('editPresetId');
+            const editPresetNameInput = document.getElementById('editPresetName');
+            const editPresetPromptTextarea = document.getElementById('editPresetPrompt');
+            const editPresetDescriptionTextarea = document.getElementById('editPresetDescription');
+            const editPresetCategorySelect = document.getElementById('editPresetCategory');
+            
+            if (!editPresetIdInput || !editPresetNameInput || !editPresetPromptTextarea || !editPresetCategorySelect) {
+                showNotification('模态框元素缺失', 'danger');
+                return;
+            }
+            
+            editPresetIdInput.value = preset.id;
+            editPresetNameInput.value = preset.name;
+            editPresetPromptTextarea.value = preset.prompt;
+            if (editPresetDescriptionTextarea) {
+                editPresetDescriptionTextarea.value = preset.description || '';
+            }
+            editPresetCategorySelect.value = preset.category;
+            
+            const modal = document.getElementById('editPresetModal');
+            if (modal) modal.classList.add('show');
+        }
+
+        function confirmEditPreset() {
+            const editPresetIdInput = document.getElementById('editPresetId');
+            const editPresetNameInput = document.getElementById('editPresetName');
+            const editPresetPromptTextarea = document.getElementById('editPresetPrompt');
+            const editPresetDescriptionTextarea = document.getElementById('editPresetDescription');
+            const editPresetCategorySelect = document.getElementById('editPresetCategory');
+            
+            if (!editPresetIdInput || !editPresetNameInput || !editPresetPromptTextarea || !editPresetCategorySelect) {
+                showNotification('模态框元素缺失', 'danger');
+                return;
+            }
+            
+            const presetId = editPresetIdInput.value;
+            const name = editPresetNameInput.value.trim();
+            const prompt = editPresetPromptTextarea.value.trim();
+            const description = editPresetDescriptionTextarea ? editPresetDescriptionTextarea.value.trim() : '';
+            const newCategory = editPresetCategorySelect.value;
+            
+            if (!name || !prompt) {
+                showNotification('请输入预设名称和提示词', 'warning');
+                return;
+            }
+            
+            // 查找预设并更新
+            let oldCategory = null;
+            let preset = null;
+            
+            for (const category in settings.presets) {
+                const presets = settings.presets[category];
+                const found = presets.find(p => p.id === presetId);
+                if (found) {
+                    preset = found;
+                    oldCategory = category;
+                    break;
+                }
+            }
+            
+            if (!preset) {
+                showNotification('找不到指定的预设', 'danger');
+                return;
+            }
+            
+            // 如果分类改变，需要移动预设
+            if (oldCategory !== newCategory) {
+                // 从旧分类中移除
+                settings.presets[oldCategory] = settings.presets[oldCategory].filter(p => p.id !== presetId);
+                
+                // 添加到新分类
+                if (!settings.presets[newCategory]) {
+                    settings.presets[newCategory] = [];
+                }
+                settings.presets[newCategory].push(preset);
+            }
+            
+            // 更新预设信息
+            preset.name = name;
+            preset.prompt = prompt;
+            preset.description = description;
+            preset.category = newCategory;
+            
+            saveData();
+            renderPresets();
+            
+            const modal = document.getElementById('editPresetModal');
+            if (modal) modal.classList.remove('show');
+            
+            showNotification('预设已更新', 'success');
+        }
+
+        function deletePreset(presetId, category) {
+            const presets = settings.presets[category] || [];
+            const presetIndex = presets.findIndex(p => p.id === presetId);
+            
+            if (presetIndex === -1) {
+                showNotification('找不到指定的预设', 'danger');
+                return;
+            }
+            
+            const presetName = presets[presetIndex].name;
+            if (confirm(`确定要删除预设 "${presetName}" 吗？`)) {
+                presets.splice(presetIndex, 1);
+                saveData();
+                renderPresets();
+                showNotification(`已删除预设: ${presetName}`, 'success');
+            }
+        }
+
+        function applyPreset(presetId, category) {
+            const presets = settings.presets[category] || [];
+            const preset = presets.find(p => p.id === presetId);
+            
+            if (!preset) {
+                showNotification('找不到指定的预设', 'danger');
+                return;
+            }
+            
+            // 清空当前选择
+            settings.selectedTags = [];
+            
+            // 解析预设的提示词并添加标签
+            const promptText = preset.prompt;
+            const positivePromptTextarea = document.getElementById('positivePrompt');
+            if (positivePromptTextarea) {
+                positivePromptTextarea.value = promptText;
+            }
+            
+            // 自动解析提示词
+            setTimeout(() => {
+                analyzePastedText();
+            }, 100);
+            
+            showNotification(`已应用预设: ${preset.name}`, 'success');
+        }
+
+        // 图片上传相关函数
+        function setupImageDragAndDrop() {
+            const imagePreviews = document.querySelectorAll('.image-preview');
+            
+            imagePreviews.forEach(preview => {
+                preview.addEventListener('dragover', function(e) {
+                    e.preventDefault();
+                    this.style.borderColor = '#4F46E5';
+                    this.style.backgroundColor = '#f1f5f9';
+                });
+                
+                preview.addEventListener('dragleave', function() {
+                    this.style.borderColor = '#e2e8f0';
+                    this.style.backgroundColor = '#f8fafc';
+                });
+                
+                preview.addEventListener('drop', function(e) {
+                    e.preventDefault();
+                    this.style.borderColor = '#e2e8f0';
+                    this.style.backgroundColor = '#f8fafc';
+                    
+                    const files = e.dataTransfer.files;
+                    if (files.length > 0 && files[0].type.startsWith('image/')) {
+                        handleImageFile(files[0], this);
+                    }
+                });
+                
+                preview.addEventListener('click', function() {
+                    const input = this.querySelector('input[type="file"]');
+                    if (input) input.click();
+                });
+            });
+        }
+
+        function handleImageUpload(e) {
+            const file = e.target.files[0];
+            if (file && file.type.startsWith('image/')) {
+                const preview = document.getElementById('imagePreview');
+                handleImageFile(file, preview);
+            }
+        }
+
+        function handleEditImageUpload(e) {
+            const file = e.target.files[0];
+            if (file && file.type.startsWith('image/')) {
+                const preview = document.getElementById('editImagePreview');
+                handleImageFile(file, preview);
+            }
+        }
+
+        function handleImageFile(file, previewElement) {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const img = previewElement.querySelector('img');
+                const placeholder = previewElement.querySelector('.image-preview-placeholder');
+                
+                if (img) {
+                    img.src = e.target.result;
+                    img.style.display = 'block';
+                } else {
+                    const newImg = document.createElement('img');
+                    newImg.src = e.target.result;
+                    newImg.style.maxWidth = '100%';
+                    newImg.style.maxHeight = '200px';
+                    newImg.style.borderRadius = '4px';
+                    newImg.style.display = 'block';
+                    previewElement.appendChild(newImg);
+                }
+                
+                if (placeholder) {
+                    placeholder.style.display = 'none';
+                }
+            };
+            reader.readAsDataURL(file);
+        }
+
+        // 页面加载完成后初始化图片拖拽上传
+        document.addEventListener('DOMContentLoaded', function() {
+            setupImageDragAndDrop();
+        });
+
+        console.log('Comfy UI Prompt Generator v12.5 初始化完成');
+    </script>
+</body>
+</html>
