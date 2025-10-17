@@ -2290,7 +2290,7 @@
             
             try {
                 if (typeof showNotification === 'function') {
-                    showNotification('欢迎使用 Mayi Prompt UI 3.4.10', 'success');
+                    showNotification('欢迎使用 Mayi Prompt UI 3.4.11', 'success');
                 }
             } catch (error) {
                 console.error('显示通知时出错:', error);
@@ -2936,21 +2936,51 @@
             }
         }
         
-        // 移动端分组列表切换按钮事件 - 安全处理
+        // 分组列表切换按钮事件（兼容桌面与移动端）
         const toggleGroupList = document.getElementById('toggleGroupList');
         if (toggleGroupList) {
+            const tagSidebar = document.getElementById('tagSidebar');
+            const span = toggleGroupList.querySelector('span');
+
+            function updateToggleLabel() {
+                if (!tagSidebar || !span) return;
+                const isDesktop = window.matchMedia('(min-width: 768px)').matches;
+                if (isDesktop) {
+                    const visible = tagSidebar.classList.contains('md:block');
+                    span.textContent = visible ? '隐藏分组列表' : '显示分组列表';
+                } else {
+                    const hidden = tagSidebar.classList.contains('hidden');
+                    span.textContent = hidden ? '显示分组列表' : '隐藏分组列表';
+                }
+            }
+
+            // 初始化文案
+            updateToggleLabel();
+            // 随窗口变化同步文案
+            window.addEventListener('resize', updateToggleLabel);
+
             toggleGroupList.addEventListener('click', function() {
-                const tagSidebar = document.getElementById('tagSidebar');
-                if (tagSidebar) {
+                if (!tagSidebar) return;
+                const isDesktop = window.matchMedia('(min-width: 768px)').matches;
+                if (isDesktop) {
+                    // 桌面端通过切换 md:block 控制显示/隐藏
+                    if (tagSidebar.classList.contains('md:block')) {
+                        tagSidebar.classList.remove('md:block');
+                        if (span) span.textContent = '显示分组列表';
+                    } else {
+                        tagSidebar.classList.add('md:block');
+                        if (span) span.textContent = '隐藏分组列表';
+                    }
+                } else {
+                    // 移动端通过切换 hidden/block 控制显示/隐藏
                     const isHidden = tagSidebar.classList.contains('hidden');
-                    
                     if (isHidden) {
                         tagSidebar.classList.remove('hidden');
-                        const span = this.querySelector('span');
+                        tagSidebar.classList.add('block');
                         if (span) span.textContent = '隐藏分组列表';
                     } else {
                         tagSidebar.classList.add('hidden');
-                        const span = this.querySelector('span');
+                        tagSidebar.classList.remove('block');
                         if (span) span.textContent = '显示分组列表';
                     }
                 }
@@ -5863,7 +5893,7 @@
                     showNegative: settings.showNegative,
                     favorites: settings.favorites
                 },
-                version: '3.4.10',
+                version: '3.4.11',
                 作者: 'Mayi',
                 Github: 'https://clay2001.github.io/Prompt-UI/',
                 exportDate: new Date().toISOString()
@@ -6113,7 +6143,7 @@
         <div class="flex flex-wrap justify-center items-center gap-2">
             <span>© 2025 Mayi Prompt UI</span>
             <span class="mx-2">•</span>
-            <span>版本 3.4.10</span>
+            <span>版本 3.4.11</span>
             <span class="mx-2">•</span>
             <a href="https://github.com/clay2001/Prompt-UI" target="_blank" rel="noopener" class="text-primary hover:underline">GitHub</a>
         </div>
