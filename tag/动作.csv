@@ -1,0 +1,141 @@
+分类,英文标签,中文翻译
+姿态（静止）,standing,站立
+姿态（静止）,sitting,坐着
+姿态（静止）,kneeling,跪姿
+姿态（静止）,crouching,蹲姿
+姿态（静止）,lying,仰卧
+姿态（静止）,prone,俯卧
+姿态（静止）,leaning,倚靠
+姿态（静止）,cross-legged,盘腿
+移动（整体）,walking,行走
+移动（整体）,running,奔跑
+移动（整体）,sprinting,冲刺
+移动（整体）,jumping,跳跃
+移动（整体）,hopping,单脚跳
+移动（整体）,climbing,攀爬
+移动（整体）,falling,下落
+移动（整体）,rolling,翻滚
+上肢动作,raise hand,举手
+上肢动作,waving,挥手
+上肢动作,arms crossed,抱臂
+上肢动作,hands on hips,叉腰
+上肢动作,reach out,伸手
+上肢动作,shrugging,耸肩
+上肢动作,hands behind back,背手
+上肢动作,arm stretch,手臂伸展
+手势与指向,pointing,指向
+手势与指向,peace sign,剪刀手
+手势与指向,ok gesture,OK 手势
+手势与指向,thumbs up,竖大拇指
+手势与指向,thumbs down,倒拇指
+手势与指向,heart hands,比心
+手势与指向,beckoning,招手
+手势与指向,salute,敬礼
+手部交互,grabbing,抓
+手部交互,holding,握
+手部交互,pushing,推
+手部交互,pulling,拉
+手部交互,throwing,投掷
+手部交互,catching,接住
+手部交互,clapping,鼓掌
+手部交互,knocking,敲击
+下肢动作,kicking,踢
+下肢动作,stomping,跺脚
+下肢动作,tiptoe,踮脚
+下肢动作,lunge,弓步
+下肢动作,step forward,前跨
+下肢动作,step back,后退
+下肢动作,sidestep,侧移
+下肢动作,one-leg balance,单腿平衡
+头部与目光,look left,左视
+头部与目光,look right,右视
+头部与目光,look up,仰视
+头部与目光,look down,俯视
+头部与目光,side glance,侧目
+头部与目光,head tilt,歪头
+头部与目光,nod,点头
+头部与目光,shake head,摇头
+身体方向与姿势,face left,面向左
+身体方向与姿势,face right,面向右
+身体方向与姿势,back facing,背对
+身体方向与姿势,profile pose,侧身
+身体方向与姿势,twist waist,扭腰
+身体方向与姿势,bend over,俯身
+身体方向与姿势,arched back,拱背
+身体方向与姿势,upright posture,身体挺直
+双人/多人互动,hugging,拥抱
+双人/多人互动,holding hands,牵手
+双人/多人互动,high five,击掌
+双人/多人互动,shoulder bump,碰肩
+双人/多人互动,back-to-back,背靠背
+双人/多人互动,handshake,握手
+双人/多人互动,carry in arms,怀抱
+双人/多人互动,lift up,举起
+舞蹈与表演,dance spin,旋转
+舞蹈与表演,en pointe,足尖姿势
+舞蹈与表演,hip sway,摆胯
+舞蹈与表演,arm wave dance,摆臂舞
+舞蹈与表演,bow,鞠躬
+舞蹈与表演,curtsy,屈膝礼
+舞蹈与表演,ballet jump,芭蕾跳
+舞蹈与表演,dramatic pose,戏剧化造型
+姿态（静止）,t-pose,T 形站姿
+姿态（静止）,a-pose,A 形站姿
+姿态（静止）,plank,平板支撑
+姿态（静止）,bridge pose,桥式
+姿态（静止）,split,劈叉
+姿态（静止）,handstand,倒立
+姿态（静止）,headstand,头倒立
+姿态（静止）,wall lean,靠墙
+姿态（静止）,floor sit,坐地
+姿态（静止）,on knees,跪坐
+移动（整体）,jogging,慢跑
+移动（整体）,skipping,跳步
+移动（整体）,marching,行进
+移动（整体）,tiptoeing,踮脚行走
+移动（整体）,sliding,滑行
+移动（整体）,gliding,轻滑
+移动（整体）,dashing,突进冲刺
+移动（整体）,dodging,闪避
+移动（整体）,pivoting,原地转身
+移动（整体）,turning,转身
+上肢动作,hands in pockets,双手插兜
+上肢动作,arms open,双臂张开
+上肢动作,arms spread,双臂展开
+上肢动作,arms overhead,双臂过头
+上肢动作,hands behind head,双手抱头
+上肢动作,hand on chin,托腮
+上肢动作,hand on cheek,扶脸
+上肢动作,cover mouth,捂嘴
+上肢动作,cover eyes,遮眼
+上肢动作,hand on forehead,扶额
+上肢动作,fist pump,振臂
+上肢动作,clenched fist,紧握拳
+上肢动作,open palm,张开手掌
+上肢动作,palm up,手心向上
+上肢动作,palm down,手心向下
+上肢动作,elbow on table,手肘撑桌
+上肢动作,arms folded,双臂叠放
+上肢动作,hands together,双手合十
+上肢动作,hands clasped,双手交握
+上肢动作,finger snap,弹指
+手势与指向,shush,嘘手势
+手势与指向,finger gun,手指枪
+手势与指向,rock sign,摇滚手势
+手势与指向,call me,打电话手势
+手势与指向,stop hand,停止手势
+手势与指向,number one,数字一手势
+手势与指向,number two,数字二手势
+手势与指向,number three,数字三手势
+手势与指向,circle gesture,圈指手势
+手势与指向,wave inward,向内招手
+手部交互,pinching,捏
+手部交互,squeezing,挤压
+手部交互,lifting,提起
+手部交互,lowering,放下
+手部交互,handing over,递给
+手部交互,receiving,接过
+手部交互,rubbing hands,搓手
+手部交互,pressing,按压
+下肢动作,high kick,高踢
+下肢动作,knee lift,抬膝

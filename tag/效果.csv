@@ -1,0 +1,141 @@
+分类,英文标签,中文翻译
+光效与照明,backlighting,逆光
+光效与照明,rim lighting,边缘光
+光效与照明,dynamic lighting,动态光效
+光效与照明,soft lighting,柔光
+光效与照明,hard lighting,硬光
+光效与照明,side lighting,侧光
+光效与照明,top lighting,顶光
+光效与照明,bottom lighting,底光
+光效与照明,spotlight,聚光灯
+光效与照明,neon lighting,霓虹灯光
+光效与照明,ambient lighting,环境光
+光效与照明,warm lighting,暖光
+光效与照明,cool lighting,冷光
+光效与照明,dramatic lighting,戏剧性光效
+光效与照明,studio lighting,影棚光
+光效与照明,low-key lighting,低调光
+光效与照明,high-key lighting,高调光
+光效与照明,golden hour,欧美
+光效与照明,blue hour,蓝调时段
+光效与照明,god rays,神光束
+光效与照明,lens flare,镜头眩光
+光效与照明,bloom,泛光
+光效与照明,light streaks,光条
+光效与照明,light trails,光轨
+色彩与色调,color grading,色彩分级
+色彩与色调,monochrome,单色
+色彩与色调,duotone,双重色调
+色彩与色调,sepia tone,复古棕褐
+色彩与色调,pastel tones,粉彩色调
+色彩与色调,vivid colors,鲜艳色彩
+色彩与色调,muted colors,柔和色彩
+色彩与色调,high saturation,高饱和
+色彩与色调,low saturation,低饱和
+色彩与色调,high contrast,高对比
+色彩与色调,low contrast,低对比
+色彩与色调,hue shift,色相偏移
+色彩与色调,color splash,色彩点映
+色彩与色调,selective color,选择性色彩
+色彩与色调,gradient,渐变
+色彩与色调,gradient map,渐变映射
+色彩与色调,color overlay,颜色叠加
+色彩与色调,tint,着色
+色彩与色调,desaturation,去饱和
+色彩与色调,grayscale,灰度
+粒子与能量,particles,粒子
+粒子与能量,sparkles,闪光颗粒
+粒子与能量,sparks,火花
+粒子与能量,embers,余烬
+粒子与能量,smoke,烟雾
+粒子与能量,fog,雾
+粒子与能量,mist,薄雾
+粒子与能量,dust,灰尘
+粒子与能量,snow particles,雪花粒子
+粒子与能量,rain particles,雨滴粒子
+粒子与能量,magic circle,魔法阵
+粒子与能量,aura,光环
+粒子与能量,energy field,能量场
+粒子与能量,energy beam,能量光束
+粒子与能量,beam of light,光束
+粒子与能量,lightning,闪电
+粒子与能量,thunderbolt,雷电
+粒子与能量,shockwave,冲击波
+粒子与能量,explosion,爆炸
+粒子与能量,fireball,火球
+粒子与能量,trail effect,尾迹效果
+粒子与能量,star particles,星光粒子
+粒子与能量,sparkle trail,闪光轨迹
+粒子与能量,particle burst,粒子喷发
+粒子与能量,glow particles,发光粒子
+粒子与能量,haze,霾
+天气与自然,sunlight,阳光
+天气与自然,moonlight,月光
+天气与自然,starry sky,星空
+天气与自然,rainbow,彩虹
+天气与自然,rain,雨
+天气与自然,snowfall,下雪
+天气与自然,blizzard,暴雪
+天气与自然,drizzle,毛毛雨
+天气与自然,storm,风暴
+天气与自然,thunderstorm,雷暴
+天气与自然,wind effect,风效
+天气与自然,sandstorm,沙尘暴
+天气与自然,sunrise,日出
+天气与自然,sunset,日落
+天气与自然,overcast,阴天
+天气与自然,cloudy,多云
+天气与自然,clear sky,晴空
+动态与模糊,motion blur,运动模糊
+动态与模糊,speed lines,速度线
+动态与模糊,smear frame,拖影帧
+动态与模糊,long exposure,长曝光
+动态与模糊,slow shutter,慢速快门
+动态与模糊,afterimage,残像
+动态与模糊,ghosting,重影
+动态与模糊,radial blur,径向模糊
+动态与模糊,zoom blur,变焦模糊
+动态与模糊,tilt-shift blur,移轴模糊
+动态与模糊,depth of field,景深
+动态与模糊,bokeh,散景
+动态与模糊,focus blur,对焦模糊
+动态与模糊,background blur,背景虚化
+动态与模糊,foreground blur,前景虚化
+动态与模糊,camera shake,机位震动
+动态与模糊,time slice,时间切片
+动态与模糊,freeze frame,定格画面
+纹理与叠加,film grain,胶片颗粒
+纹理与叠加,noise texture,噪点纹理
+纹理与叠加,halftone,半色调
+纹理与叠加,dithering,抖动
+纹理与叠加,scanlines,扫描线
+纹理与叠加,CRT effect,显像管效果
+纹理与叠加,VHS effect,录像带效果
+纹理与叠加,glitch,故障效果
+纹理与叠加,distortion,变形扭曲
+纹理与叠加,chromatic aberration,色差
+纹理与叠加,vignette,暗角
+纹理与叠加,watercolor effect,水彩效果
+纹理与叠加,oil paint effect,油画效果
+纹理与叠加,sketch effect,速写效果
+纹理与叠加,pixelation,像素化
+纹理与叠加,mosaic,马赛克
+纹理与叠加,posterization,色阶分段
+纹理与叠加,comic screentone,网点贴图
+纹理与叠加,paper texture,纸张纹理
+纹理与叠加,ink bleed,墨迹晕染
+纹理与叠加,light leak,漏光
+纹理与叠加,burn-in,灼印
+纹理与叠加,double exposure,双重曝光
+影子与反射,strong shadow,强阴影
+影子与反射,soft shadow,软阴影
+影子与反射,cast shadow,投影
+影子与反射,drop shadow,阴影投射
+影子与反射,silhouette,剪影
+影子与反射,reflection,反射
+影子与反射,mirror reflection,镜像反射
+影子与反射,refraction,折射
+影子与反射,caustics,焦散
+影子与反射,chiaroscuro,明暗对照
+发光与荧光,glowing,发光
+发光与荧光,neon glow,霓虹发光

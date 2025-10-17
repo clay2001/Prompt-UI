@@ -1086,6 +1086,14 @@
             color: white !important;
             border-color: rgba(255, 255, 255, 0.3);
         }
+        /* 建议下拉样式 */
+        .suggestion-dropdown { position: absolute; top: 100%; left: 0; right: 0; z-index: 50; background: #fff; border: 1px solid #e2e8f0; border-radius: 8px; box-shadow: 0 8px 20px rgba(0,0,0,0.12); margin-top: 4px; max-height: 240px; overflow-y: auto; }
+        .suggestion-item { display:flex; justify-content: space-between; align-items: center; padding: 8px 10px; cursor:pointer; font-size: 12px; border-bottom: 1px solid #f1f5f9; }
+        .suggestion-item:last-child { border-bottom: none; }
+        .suggestion-item:hover { background:#f8fafc; }
+        .suggestion-primary { font-weight:600; color:#1e293b; }
+        .suggestion-secondary { color:#64748b; margin-left:8px; }
+        .suggestion-empty { padding:10px; color:#94a3b8; text-align:center; font-size:12px; }
     </style>
 </head>
 <body class="min-h-screen py-6 px-4">
@@ -1146,14 +1154,14 @@
         <!-- 标签管理区域 -->
         <div class="app-card">
             <div class="title-bar">
-                <h3 class="section-title">
+                <h3 id="tagManagementHeader" class="section-title">
                     <i class="fas fa-tags text-primary mr-2"></i> 标签管理
                 </h3>
                 <div class="title-actions">
                     <!-- 标签搜索框 -->
                     <div class="relative mr-2">
                         <input type="text" id="tagSearchInput" class="w-48 px-4 py-1 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition" placeholder="搜索标签...">
-                        <span class="absolute right-3 top-1.5 text-gray-400">
+                        <span class="absolute right-3 text-gray-400" style="top:50%; transform: translateY(-55%);">
                             <i class="fas fa-search text-xs"></i>
                         </span>
                     </div>
@@ -1210,7 +1218,7 @@
                     <!-- Prompt搜索框 -->
                     <div class="relative mr-2">
                         <input type="text" id="presetSearchInput" class="w-48 px-4 py-1 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition" placeholder="搜索Prompt...">
-                        <span class="absolute right-3 top-1.5 text-gray-400">
+                        <span class="absolute right-3 text-gray-400" style="top:50%; transform: translateY(-55%);">
                             <i class="fas fa-search text-xs"></i>
                         </span>
                     </div>
@@ -1666,7 +1674,7 @@
             { id: 'character', name: '姿态', color: '#059669', isSystem: false },
             { id: 'environment', name: '服饰', color: '#7c3aed', isSystem: false },
             { id: 'lighting', name: '服装', color: '#ea580c', isSystem: false },
-            { id: 'details', name: '画面', color: '#0891b2', isSystem: false },
+            { id: 'details', name: '效果', color: '#0891b2', isSystem: false },
             { id: 'negative', name: '风格', color: '#4b5563', isSystem: false },
             { id: 'custom', name: '视角', color: '#d97706', isSystem: false },
             { id: 'r18', name: 'R18', color: '#db2777', isSystem: false }
@@ -1680,7 +1688,16 @@
                 { id: 'default', name: '默认分组', description: '默认分组' }
             ],
             character: [
-                { id: 'default', name: '默认分组', description: '默认分组' }
+                { id: 'pose_static', name: '姿态（静止）', description: '静止姿态相关' },
+                { id: 'movement', name: '移动（整体）', description: '整体移动动作' },
+                { id: 'upper_limb', name: '上肢动作', description: '上肢相关动作' },
+                { id: 'gestures_pointing', name: '手势与指向', description: '手势及指向类动作' },
+                { id: 'hand_interaction', name: '手部交互', description: '手部交互动作' },
+                { id: 'lower_limb', name: '下肢动作', description: '下肢相关动作' },
+                { id: 'head_gaze', name: '头部与目光', description: '头部方向与目光' },
+                { id: 'body_orientation', name: '身体方向与姿势', description: '身体方向与姿态' },
+                { id: 'multi_person', name: '双人/多人互动', description: '多人互动动作' },
+                { id: 'dance_performance', name: '舞蹈与表演', description: '舞蹈与表演姿态' }
             ],
             environment: [
                 { id: 'default', name: '默认分组', description: '默认分组' }
@@ -1689,7 +1706,14 @@
                 { id: 'default', name: '默认分组', description: '默认分组' }
             ],
             details: [
-                { id: 'default', name: '默认分组', description: '默认分组' }
+                { id: 'lighting_effects', name: '光效与照明', description: '光照类型与光效' },
+                { id: 'color_tone', name: '色彩与色调', description: '色彩分级与色调风格' },
+                { id: 'particles_energy', name: '粒子与能量', description: '粒子、能量束、冲击波' },
+                { id: 'weather_nature', name: '天气与自然', description: '自然天气与环境特效' },
+                { id: 'motion_blur', name: '动态与模糊', description: '运动/景深/模糊类效果' },
+                { id: 'textures_overlays', name: '纹理与叠加', description: '纹理、叠加与后期效果' },
+                { id: 'shadows_reflections', name: '影子与反射', description: '阴影、反射与折射' },
+                { id: 'glow_fluorescence', name: '发光与荧光', description: '发光、荧光与霓虹' }
             ],
             negative: [
                 { id: 'default', name: '默认分组', description: '默认分组' }
@@ -1730,16 +1754,146 @@
                 { id: 's10', name: '3D渲染', text: '3d render', color: '#2563eb', group: 'default', allowPin: true, allowFavorite: true }
             ],
             character: [
-                { id: 'c1', name: '美丽女孩', text: 'beautiful girl', color: '#059669', group: 'default', allowPin: true, allowFavorite: true },
-                { id: 'c2', name: '可爱女孩', text: 'cute girl', color: '#059669', group: 'default', allowPin: true, allowFavorite: true },
-                { id: 'c3', name: '英俊男孩', text: 'handsome boy', color: '#059669', group: 'default', allowPin: true, allowFavorite: true },
-                { id: 'c4', name: '成熟女性', text: 'mature woman', color: '#059669', group: 'default', allowPin: true, allowFavorite: true },
-                { id: 'c5', name: '成熟男性', text: 'mature man', color: '#059669', group: 'default', allowPin: true, allowFavorite: true },
-                { id: 'c6', name: '少女', text: 'young girl', color: '#059669', group: 'default', allowPin: true, allowFavorite: true },
-                { id: 'c7', name: '少年', text: 'young boy', color: '#059669', group: 'default', allowPin: true, allowFavorite: true },
-                { id: 'c8', name: '老人', text: 'elderly', color: '#059669', group: 'default', allowPin: true, allowFavorite: true },
-                { id: 'c9', name: '小孩', text: 'child', color: '#059669', group: 'default', allowPin: true, allowFavorite: true },
-                { id: 'c10', name: '魔法少女', text: 'magical girl', color: '#059669', group: 'default', allowPin: true, allowFavorite: true }
+                { id: 'c1', name: '站立', text: 'standing', color: '#059669', group: 'pose_static', allowPin: true, allowFavorite: true },
+                { id: 'c2', name: '坐着', text: 'sitting', color: '#059669', group: 'pose_static', allowPin: true, allowFavorite: true },
+                { id: 'c3', name: '跪姿', text: 'kneeling', color: '#059669', group: 'pose_static', allowPin: true, allowFavorite: true },
+                { id: 'c4', name: '蹲姿', text: 'crouching', color: '#059669', group: 'pose_static', allowPin: true, allowFavorite: true },
+                { id: 'c5', name: '仰卧', text: 'lying', color: '#059669', group: 'pose_static', allowPin: true, allowFavorite: true },
+                { id: 'c6', name: '俯卧', text: 'prone', color: '#059669', group: 'pose_static', allowPin: true, allowFavorite: true },
+                { id: 'c7', name: '倚靠', text: 'leaning', color: '#059669', group: 'pose_static', allowPin: true, allowFavorite: true },
+                { id: 'c8', name: '盘腿', text: 'cross-legged', color: '#059669', group: 'pose_static', allowPin: true, allowFavorite: true },
+                { id: 'c9', name: '行走', text: 'walking', color: '#059669', group: 'movement', allowPin: true, allowFavorite: true },
+                { id: 'c10', name: '奔跑', text: 'running', color: '#059669', group: 'movement', allowPin: true, allowFavorite: true },
+                { id: 'c11', name: '冲刺', text: 'sprinting', color: '#059669', group: 'movement', allowPin: true, allowFavorite: true },
+                { id: 'c12', name: '跳跃', text: 'jumping', color: '#059669', group: 'movement', allowPin: true, allowFavorite: true },
+                { id: 'c13', name: '单脚跳', text: 'hopping', color: '#059669', group: 'movement', allowPin: true, allowFavorite: true },
+                { id: 'c14', name: '攀爬', text: 'climbing', color: '#059669', group: 'movement', allowPin: true, allowFavorite: true },
+                { id: 'c15', name: '下落', text: 'falling', color: '#059669', group: 'movement', allowPin: true, allowFavorite: true },
+                { id: 'c16', name: '翻滚', text: 'rolling', color: '#059669', group: 'movement', allowPin: true, allowFavorite: true },
+                { id: 'c17', name: '举手', text: 'raise hand', color: '#059669', group: 'upper_limb', allowPin: true, allowFavorite: true },
+                { id: 'c18', name: '挥手', text: 'waving', color: '#059669', group: 'upper_limb', allowPin: true, allowFavorite: true },
+                { id: 'c19', name: '抱臂', text: 'arms crossed', color: '#059669', group: 'upper_limb', allowPin: true, allowFavorite: true },
+                { id: 'c20', name: '叉腰', text: 'hands on hips', color: '#059669', group: 'upper_limb', allowPin: true, allowFavorite: true },
+                { id: 'c21', name: '伸手', text: 'reach out', color: '#059669', group: 'upper_limb', allowPin: true, allowFavorite: true },
+                { id: 'c22', name: '耸肩', text: 'shrugging', color: '#059669', group: 'upper_limb', allowPin: true, allowFavorite: true },
+                { id: 'c23', name: '背手', text: 'hands behind back', color: '#059669', group: 'upper_limb', allowPin: true, allowFavorite: true },
+                { id: 'c24', name: '手臂伸展', text: 'arm stretch', color: '#059669', group: 'upper_limb', allowPin: true, allowFavorite: true },
+                { id: 'c25', name: '指向', text: 'pointing', color: '#059669', group: 'gestures_pointing', allowPin: true, allowFavorite: true },
+                { id: 'c26', name: '剪刀手', text: 'peace sign', color: '#059669', group: 'gestures_pointing', allowPin: true, allowFavorite: true },
+                { id: 'c27', name: 'OK 手势', text: 'ok gesture', color: '#059669', group: 'gestures_pointing', allowPin: true, allowFavorite: true },
+                { id: 'c28', name: '竖大拇指', text: 'thumbs up', color: '#059669', group: 'gestures_pointing', allowPin: true, allowFavorite: true },
+                { id: 'c29', name: '倒拇指', text: 'thumbs down', color: '#059669', group: 'gestures_pointing', allowPin: true, allowFavorite: true },
+                { id: 'c30', name: '比心', text: 'heart hands', color: '#059669', group: 'gestures_pointing', allowPin: true, allowFavorite: true },
+                { id: 'c31', name: '招手', text: 'beckoning', color: '#059669', group: 'gestures_pointing', allowPin: true, allowFavorite: true },
+                { id: 'c32', name: '敬礼', text: 'salute', color: '#059669', group: 'gestures_pointing', allowPin: true, allowFavorite: true },
+                { id: 'c33', name: '抓', text: 'grabbing', color: '#059669', group: 'hand_interaction', allowPin: true, allowFavorite: true },
+                { id: 'c34', name: '握', text: 'holding', color: '#059669', group: 'hand_interaction', allowPin: true, allowFavorite: true },
+                { id: 'c35', name: '推', text: 'pushing', color: '#059669', group: 'hand_interaction', allowPin: true, allowFavorite: true },
+                { id: 'c36', name: '拉', text: 'pulling', color: '#059669', group: 'hand_interaction', allowPin: true, allowFavorite: true },
+                { id: 'c37', name: '投掷', text: 'throwing', color: '#059669', group: 'hand_interaction', allowPin: true, allowFavorite: true },
+                { id: 'c38', name: '接住', text: 'catching', color: '#059669', group: 'hand_interaction', allowPin: true, allowFavorite: true },
+                { id: 'c39', name: '鼓掌', text: 'clapping', color: '#059669', group: 'hand_interaction', allowPin: true, allowFavorite: true },
+                { id: 'c40', name: '敲击', text: 'knocking', color: '#059669', group: 'hand_interaction', allowPin: true, allowFavorite: true },
+                { id: 'c41', name: '踢', text: 'kicking', color: '#059669', group: 'lower_limb', allowPin: true, allowFavorite: true },
+                { id: 'c42', name: '跺脚', text: 'stomping', color: '#059669', group: 'lower_limb', allowPin: true, allowFavorite: true },
+                { id: 'c43', name: '踮脚', text: 'tiptoe', color: '#059669', group: 'lower_limb', allowPin: true, allowFavorite: true },
+                { id: 'c44', name: '弓步', text: 'lunge', color: '#059669', group: 'lower_limb', allowPin: true, allowFavorite: true },
+                { id: 'c45', name: '前跨', text: 'step forward', color: '#059669', group: 'lower_limb', allowPin: true, allowFavorite: true },
+                { id: 'c46', name: '后退', text: 'step back', color: '#059669', group: 'lower_limb', allowPin: true, allowFavorite: true },
+                { id: 'c47', name: '侧移', text: 'sidestep', color: '#059669', group: 'lower_limb', allowPin: true, allowFavorite: true },
+                { id: 'c48', name: '单腿平衡', text: 'one-leg balance', color: '#059669', group: 'lower_limb', allowPin: true, allowFavorite: true },
+                { id: 'c49', name: '左视', text: 'look left', color: '#059669', group: 'head_gaze', allowPin: true, allowFavorite: true },
+                { id: 'c50', name: '右视', text: 'look right', color: '#059669', group: 'head_gaze', allowPin: true, allowFavorite: true },
+                { id: 'c51', name: '仰视', text: 'look up', color: '#059669', group: 'head_gaze', allowPin: true, allowFavorite: true },
+                { id: 'c52', name: '俯视', text: 'look down', color: '#059669', group: 'head_gaze', allowPin: true, allowFavorite: true },
+                { id: 'c53', name: '侧目', text: 'side glance', color: '#059669', group: 'head_gaze', allowPin: true, allowFavorite: true },
+                { id: 'c54', name: '歪头', text: 'head tilt', color: '#059669', group: 'head_gaze', allowPin: true, allowFavorite: true },
+                { id: 'c55', name: '点头', text: 'nod', color: '#059669', group: 'head_gaze', allowPin: true, allowFavorite: true },
+                { id: 'c56', name: '摇头', text: 'shake head', color: '#059669', group: 'head_gaze', allowPin: true, allowFavorite: true },
+                { id: 'c57', name: '面向左', text: 'face left', color: '#059669', group: 'body_orientation', allowPin: true, allowFavorite: true },
+                { id: 'c58', name: '面向右', text: 'face right', color: '#059669', group: 'body_orientation', allowPin: true, allowFavorite: true },
+                { id: 'c59', name: '背对', text: 'back facing', color: '#059669', group: 'body_orientation', allowPin: true, allowFavorite: true },
+                { id: 'c60', name: '侧身', text: 'profile pose', color: '#059669', group: 'body_orientation', allowPin: true, allowFavorite: true },
+                { id: 'c61', name: '扭腰', text: 'twist waist', color: '#059669', group: 'body_orientation', allowPin: true, allowFavorite: true },
+                { id: 'c62', name: '俯身', text: 'bend over', color: '#059669', group: 'body_orientation', allowPin: true, allowFavorite: true },
+                { id: 'c63', name: '拱背', text: 'arched back', color: '#059669', group: 'body_orientation', allowPin: true, allowFavorite: true },
+                { id: 'c64', name: '身体挺直', text: 'upright posture', color: '#059669', group: 'body_orientation', allowPin: true, allowFavorite: true },
+                { id: 'c65', name: '拥抱', text: 'hugging', color: '#059669', group: 'multi_person', allowPin: true, allowFavorite: true },
+                { id: 'c66', name: '牵手', text: 'holding hands', color: '#059669', group: 'multi_person', allowPin: true, allowFavorite: true },
+                { id: 'c67', name: '击掌', text: 'high five', color: '#059669', group: 'multi_person', allowPin: true, allowFavorite: true },
+                { id: 'c68', name: '碰肩', text: 'shoulder bump', color: '#059669', group: 'multi_person', allowPin: true, allowFavorite: true },
+                { id: 'c69', name: '背靠背', text: 'back-to-back', color: '#059669', group: 'multi_person', allowPin: true, allowFavorite: true },
+                { id: 'c70', name: '握手', text: 'handshake', color: '#059669', group: 'multi_person', allowPin: true, allowFavorite: true },
+                { id: 'c71', name: '怀抱', text: 'carry in arms', color: '#059669', group: 'multi_person', allowPin: true, allowFavorite: true },
+                { id: 'c72', name: '举起', text: 'lift up', color: '#059669', group: 'multi_person', allowPin: true, allowFavorite: true },
+                { id: 'c73', name: '旋转', text: 'dance spin', color: '#059669', group: 'dance_performance', allowPin: true, allowFavorite: true },
+                { id: 'c74', name: '足尖姿势', text: 'en pointe', color: '#059669', group: 'dance_performance', allowPin: true, allowFavorite: true },
+                { id: 'c75', name: '摆胯', text: 'hip sway', color: '#059669', group: 'dance_performance', allowPin: true, allowFavorite: true },
+                { id: 'c76', name: '摆臂舞', text: 'arm wave dance', color: '#059669', group: 'dance_performance', allowPin: true, allowFavorite: true },
+                { id: 'c77', name: '鞠躬', text: 'bow', color: '#059669', group: 'dance_performance', allowPin: true, allowFavorite: true },
+                { id: 'c78', name: '屈膝礼', text: 'curtsy', color: '#059669', group: 'dance_performance', allowPin: true, allowFavorite: true },
+                { id: 'c79', name: '芭蕾跳', text: 'ballet jump', color: '#059669', group: 'dance_performance', allowPin: true, allowFavorite: true },
+                { id: 'c80', name: '戏剧化造型', text: 'dramatic pose', color: '#059669', group: 'dance_performance', allowPin: true, allowFavorite: true },
+                { id: 'c81', name: 'T 形站姿', text: 't-pose', color: '#059669', group: 'pose_static', allowPin: true, allowFavorite: true },
+                { id: 'c82', name: 'A 形站姿', text: 'a-pose', color: '#059669', group: 'pose_static', allowPin: true, allowFavorite: true },
+                { id: 'c83', name: '平板支撑', text: 'plank', color: '#059669', group: 'pose_static', allowPin: true, allowFavorite: true },
+                { id: 'c84', name: '桥式', text: 'bridge pose', color: '#059669', group: 'pose_static', allowPin: true, allowFavorite: true },
+                { id: 'c85', name: '劈叉', text: 'split', color: '#059669', group: 'pose_static', allowPin: true, allowFavorite: true },
+                { id: 'c86', name: '倒立', text: 'handstand', color: '#059669', group: 'pose_static', allowPin: true, allowFavorite: true },
+                { id: 'c87', name: '头倒立', text: 'headstand', color: '#059669', group: 'pose_static', allowPin: true, allowFavorite: true },
+                { id: 'c88', name: '靠墙', text: 'wall lean', color: '#059669', group: 'pose_static', allowPin: true, allowFavorite: true },
+                { id: 'c89', name: '坐地', text: 'floor sit', color: '#059669', group: 'pose_static', allowPin: true, allowFavorite: true },
+                { id: 'c90', name: '跪坐', text: 'on knees', color: '#059669', group: 'pose_static', allowPin: true, allowFavorite: true },
+                { id: 'c91', name: '慢跑', text: 'jogging', color: '#059669', group: 'movement', allowPin: true, allowFavorite: true },
+                { id: 'c92', name: '跳步', text: 'skipping', color: '#059669', group: 'movement', allowPin: true, allowFavorite: true },
+                { id: 'c93', name: '行进', text: 'marching', color: '#059669', group: 'movement', allowPin: true, allowFavorite: true },
+                { id: 'c94', name: '踮脚行走', text: 'tiptoeing', color: '#059669', group: 'movement', allowPin: true, allowFavorite: true },
+                { id: 'c95', name: '滑行', text: 'sliding', color: '#059669', group: 'movement', allowPin: true, allowFavorite: true },
+                { id: 'c96', name: '轻滑', text: 'gliding', color: '#059669', group: 'movement', allowPin: true, allowFavorite: true },
+                { id: 'c97', name: '突进冲刺', text: 'dashing', color: '#059669', group: 'movement', allowPin: true, allowFavorite: true },
+                { id: 'c98', name: '闪避', text: 'dodging', color: '#059669', group: 'movement', allowPin: true, allowFavorite: true },
+                { id: 'c99', name: '原地转身', text: 'pivoting', color: '#059669', group: 'movement', allowPin: true, allowFavorite: true },
+                { id: 'c100', name: '转身', text: 'turning', color: '#059669', group: 'movement', allowPin: true, allowFavorite: true },
+                { id: 'c101', name: '双手插兜', text: 'hands in pockets', color: '#059669', group: 'upper_limb', allowPin: true, allowFavorite: true },
+                { id: 'c102', name: '双臂张开', text: 'arms open', color: '#059669', group: 'upper_limb', allowPin: true, allowFavorite: true },
+                { id: 'c103', name: '双臂展开', text: 'arms spread', color: '#059669', group: 'upper_limb', allowPin: true, allowFavorite: true },
+                { id: 'c104', name: '双臂过头', text: 'arms overhead', color: '#059669', group: 'upper_limb', allowPin: true, allowFavorite: true },
+                { id: 'c105', name: '双手抱头', text: 'hands behind head', color: '#059669', group: 'upper_limb', allowPin: true, allowFavorite: true },
+                { id: 'c106', name: '托腮', text: 'hand on chin', color: '#059669', group: 'upper_limb', allowPin: true, allowFavorite: true },
+                { id: 'c107', name: '扶脸', text: 'hand on cheek', color: '#059669', group: 'upper_limb', allowPin: true, allowFavorite: true },
+                { id: 'c108', name: '捂嘴', text: 'cover mouth', color: '#059669', group: 'upper_limb', allowPin: true, allowFavorite: true },
+                { id: 'c109', name: '遮眼', text: 'cover eyes', color: '#059669', group: 'upper_limb', allowPin: true, allowFavorite: true },
+                { id: 'c110', name: '扶额', text: 'hand on forehead', color: '#059669', group: 'upper_limb', allowPin: true, allowFavorite: true },
+                { id: 'c111', name: '振臂', text: 'fist pump', color: '#059669', group: 'upper_limb', allowPin: true, allowFavorite: true },
+                { id: 'c112', name: '紧握拳', text: 'clenched fist', color: '#059669', group: 'upper_limb', allowPin: true, allowFavorite: true },
+                { id: 'c113', name: '张开手掌', text: 'open palm', color: '#059669', group: 'upper_limb', allowPin: true, allowFavorite: true },
+                { id: 'c114', name: '手心向上', text: 'palm up', color: '#059669', group: 'upper_limb', allowPin: true, allowFavorite: true },
+                { id: 'c115', name: '手心向下', text: 'palm down', color: '#059669', group: 'upper_limb', allowPin: true, allowFavorite: true },
+                { id: 'c116', name: '手肘撑桌', text: 'elbow on table', color: '#059669', group: 'upper_limb', allowPin: true, allowFavorite: true },
+                { id: 'c117', name: '双臂叠放', text: 'arms folded', color: '#059669', group: 'upper_limb', allowPin: true, allowFavorite: true },
+                { id: 'c118', name: '双手合十', text: 'hands together', color: '#059669', group: 'upper_limb', allowPin: true, allowFavorite: true },
+                { id: 'c119', name: '双手交握', text: 'hands clasped', color: '#059669', group: 'upper_limb', allowPin: true, allowFavorite: true },
+                { id: 'c120', name: '弹指', text: 'finger snap', color: '#059669', group: 'upper_limb', allowPin: true, allowFavorite: true },
+                { id: 'c121', name: '嘘手势', text: 'shush', color: '#059669', group: 'gestures_pointing', allowPin: true, allowFavorite: true },
+                { id: 'c122', name: '手指枪', text: 'finger gun', color: '#059669', group: 'gestures_pointing', allowPin: true, allowFavorite: true },
+                { id: 'c123', name: '摇滚手势', text: 'rock sign', color: '#059669', group: 'gestures_pointing', allowPin: true, allowFavorite: true },
+                { id: 'c124', name: '打电话手势', text: 'call me', color: '#059669', group: 'gestures_pointing', allowPin: true, allowFavorite: true },
+                { id: 'c125', name: '停止手势', text: 'stop hand', color: '#059669', group: 'gestures_pointing', allowPin: true, allowFavorite: true },
+                { id: 'c126', name: '数字一手势', text: 'number one', color: '#059669', group: 'gestures_pointing', allowPin: true, allowFavorite: true },
+                { id: 'c127', name: '数字二手势', text: 'number two', color: '#059669', group: 'gestures_pointing', allowPin: true, allowFavorite: true },
+                { id: 'c128', name: '数字三手势', text: 'number three', color: '#059669', group: 'gestures_pointing', allowPin: true, allowFavorite: true },
+                { id: 'c129', name: '圈指手势', text: 'circle gesture', color: '#059669', group: 'gestures_pointing', allowPin: true, allowFavorite: true },
+                { id: 'c130', name: '向内招手', text: 'wave inward', color: '#059669', group: 'gestures_pointing', allowPin: true, allowFavorite: true },
+                { id: 'c131', name: '捏', text: 'pinching', color: '#059669', group: 'hand_interaction', allowPin: true, allowFavorite: true },
+                { id: 'c132', name: '挤压', text: 'squeezing', color: '#059669', group: 'hand_interaction', allowPin: true, allowFavorite: true },
+                { id: 'c133', name: '提起', text: 'lifting', color: '#059669', group: 'hand_interaction', allowPin: true, allowFavorite: true },
+                { id: 'c134', name: '放下', text: 'lowering', color: '#059669', group: 'hand_interaction', allowPin: true, allowFavorite: true },
+                { id: 'c135', name: '递给', text: 'handing over', color: '#059669', group: 'hand_interaction', allowPin: true, allowFavorite: true },
+                { id: 'c136', name: '接过', text: 'receiving', color: '#059669', group: 'hand_interaction', allowPin: true, allowFavorite: true },
+                { id: 'c137', name: '搓手', text: 'rubbing hands', color: '#059669', group: 'hand_interaction', allowPin: true, allowFavorite: true },
+                { id: 'c138', name: '按压', text: 'pressing', color: '#059669', group: 'hand_interaction', allowPin: true, allowFavorite: true },
+                { id: 'c139', name: '高踢', text: 'high kick', color: '#059669', group: 'lower_limb', allowPin: true, allowFavorite: true },
+                { id: 'c140', name: '抬膝', text: 'knee lift', color: '#059669', group: 'lower_limb', allowPin: true, allowFavorite: true }
             ],
             environment: [
                 { id: 'e1', name: '户外', text: 'outdoor', color: '#7c3aed', group: 'default', allowPin: true, allowFavorite: true },
@@ -1766,16 +1920,146 @@
                 { id: 'l10', name: '蓝调时段', text: 'blue hour', color: '#ea580c', group: 'default', allowPin: true, allowFavorite: true }
             ],
             details: [
-                { id: 'd1', name: '详细背景', text: 'detailed background', color: '#0891b2', group: 'default', allowPin: true, allowFavorite: true },
-                { id: 'd2', name: '复杂背景', text: 'complex background', color: '#0891b2', group: 'default', allowPin: true, allowFavorite: true },
-                { id: 'd3', name: '简单背景', text: 'simple background', color: '#0891b2', group: 'default', allowPin: true, allowFavorite: true },
-                { id: 'd4', name: '纯色背景', text: 'solid color background', color: '#0891b2', group: 'default', allowPin: true, allowFavorite: true },
-                { id: 'd5', name: '渐变背景', text: 'gradient background', color: '#0891b2', group: 'default', allowPin: true, allowFavorite: true },
-                { id: 'd6', name: '透明背景', text: 'transparent background', color: '#0891b2', group: 'default', allowPin: true, allowFavorite: true },
-                { id: 'd7', name: '模糊背景', text: 'blurry background', color: '#0891b2', group: 'default', allowPin: true, allowFavorite: true },
-                { id: 'd8', name: '焦点背景', text: 'focused background', color: '#0891b2', group: 'default', allowPin: true, allowFavorite: true },
-                { id: 'd9', name: '抽象背景', text: 'abstract background', color: '#0891b2', group: 'default', allowPin: true, allowFavorite: true },
-                { id: 'd10', name: '纹理背景', text: 'textured background', color: '#0891b2', group: 'default', allowPin: true, allowFavorite: true }
+                { id: 'd1', name: '逆光', text: 'backlighting', color: '#0891b2', group: 'lighting_effects', allowPin: true, allowFavorite: true },
+                { id: 'd2', name: '边缘光', text: 'rim lighting', color: '#0891b2', group: 'lighting_effects', allowPin: true, allowFavorite: true },
+                { id: 'd3', name: '动态光效', text: 'dynamic lighting', color: '#0891b2', group: 'lighting_effects', allowPin: true, allowFavorite: true },
+                { id: 'd4', name: '柔光', text: 'soft lighting', color: '#0891b2', group: 'lighting_effects', allowPin: true, allowFavorite: true },
+                { id: 'd5', name: '硬光', text: 'hard lighting', color: '#0891b2', group: 'lighting_effects', allowPin: true, allowFavorite: true },
+                { id: 'd6', name: '侧光', text: 'side lighting', color: '#0891b2', group: 'lighting_effects', allowPin: true, allowFavorite: true },
+                { id: 'd7', name: '顶光', text: 'top lighting', color: '#0891b2', group: 'lighting_effects', allowPin: true, allowFavorite: true },
+                { id: 'd8', name: '底光', text: 'bottom lighting', color: '#0891b2', group: 'lighting_effects', allowPin: true, allowFavorite: true },
+                { id: 'd9', name: '聚光灯', text: 'spotlight', color: '#0891b2', group: 'lighting_effects', allowPin: true, allowFavorite: true },
+                { id: 'd10', name: '霓虹灯光', text: 'neon lighting', color: '#0891b2', group: 'lighting_effects', allowPin: true, allowFavorite: true },
+                { id: 'd11', name: '环境光', text: 'ambient lighting', color: '#0891b2', group: 'lighting_effects', allowPin: true, allowFavorite: true },
+                { id: 'd12', name: '暖光', text: 'warm lighting', color: '#0891b2', group: 'lighting_effects', allowPin: true, allowFavorite: true },
+                { id: 'd13', name: '冷光', text: 'cool lighting', color: '#0891b2', group: 'lighting_effects', allowPin: true, allowFavorite: true },
+                { id: 'd14', name: '戏剧性光效', text: 'dramatic lighting', color: '#0891b2', group: 'lighting_effects', allowPin: true, allowFavorite: true },
+                { id: 'd15', name: '影棚光', text: 'studio lighting', color: '#0891b2', group: 'lighting_effects', allowPin: true, allowFavorite: true },
+                { id: 'd16', name: '低调光', text: 'low-key lighting', color: '#0891b2', group: 'lighting_effects', allowPin: true, allowFavorite: true },
+                { id: 'd17', name: '高调光', text: 'high-key lighting', color: '#0891b2', group: 'lighting_effects', allowPin: true, allowFavorite: true },
+                { id: 'd18', name: '黄金时段', text: 'golden hour', color: '#0891b2', group: 'lighting_effects', allowPin: true, allowFavorite: true },
+                { id: 'd19', name: '蓝调时段', text: 'blue hour', color: '#0891b2', group: 'lighting_effects', allowPin: true, allowFavorite: true },
+                { id: 'd20', name: '神光束', text: 'god rays', color: '#0891b2', group: 'lighting_effects', allowPin: true, allowFavorite: true },
+                { id: 'd21', name: '镜头眩光', text: 'lens flare', color: '#0891b2', group: 'lighting_effects', allowPin: true, allowFavorite: true },
+                { id: 'd22', name: '泛光', text: 'bloom', color: '#0891b2', group: 'lighting_effects', allowPin: true, allowFavorite: true },
+                { id: 'd23', name: '光条', text: 'light streaks', color: '#0891b2', group: 'lighting_effects', allowPin: true, allowFavorite: true },
+                { id: 'd24', name: '光轨', text: 'light trails', color: '#0891b2', group: 'lighting_effects', allowPin: true, allowFavorite: true },
+                { id: 'd25', name: '色彩分级', text: 'color grading', color: '#0891b2', group: 'color_tone', allowPin: true, allowFavorite: true },
+                { id: 'd26', name: '单色', text: 'monochrome', color: '#0891b2', group: 'color_tone', allowPin: true, allowFavorite: true },
+                { id: 'd27', name: '双重色调', text: 'duotone', color: '#0891b2', group: 'color_tone', allowPin: true, allowFavorite: true },
+                { id: 'd28', name: '复古棕褐', text: 'sepia tone', color: '#0891b2', group: 'color_tone', allowPin: true, allowFavorite: true },
+                { id: 'd29', name: '粉彩色调', text: 'pastel tones', color: '#0891b2', group: 'color_tone', allowPin: true, allowFavorite: true },
+                { id: 'd30', name: '鲜艳色彩', text: 'vivid colors', color: '#0891b2', group: 'color_tone', allowPin: true, allowFavorite: true },
+                { id: 'd31', name: '柔和色彩', text: 'muted colors', color: '#0891b2', group: 'color_tone', allowPin: true, allowFavorite: true },
+                { id: 'd32', name: '高饱和', text: 'high saturation', color: '#0891b2', group: 'color_tone', allowPin: true, allowFavorite: true },
+                { id: 'd33', name: '低饱和', text: 'low saturation', color: '#0891b2', group: 'color_tone', allowPin: true, allowFavorite: true },
+                { id: 'd34', name: '高对比', text: 'high contrast', color: '#0891b2', group: 'color_tone', allowPin: true, allowFavorite: true },
+                { id: 'd35', name: '低对比', text: 'low contrast', color: '#0891b2', group: 'color_tone', allowPin: true, allowFavorite: true },
+                { id: 'd36', name: '色相偏移', text: 'hue shift', color: '#0891b2', group: 'color_tone', allowPin: true, allowFavorite: true },
+                { id: 'd37', name: '色彩点映', text: 'color splash', color: '#0891b2', group: 'color_tone', allowPin: true, allowFavorite: true },
+                { id: 'd38', name: '选择性色彩', text: 'selective color', color: '#0891b2', group: 'color_tone', allowPin: true, allowFavorite: true },
+                { id: 'd39', name: '渐变', text: 'gradient', color: '#0891b2', group: 'color_tone', allowPin: true, allowFavorite: true },
+                { id: 'd40', name: '渐变映射', text: 'gradient map', color: '#0891b2', group: 'color_tone', allowPin: true, allowFavorite: true },
+                { id: 'd41', name: '颜色叠加', text: 'color overlay', color: '#0891b2', group: 'color_tone', allowPin: true, allowFavorite: true },
+                { id: 'd42', name: '着色', text: 'tint', color: '#0891b2', group: 'color_tone', allowPin: true, allowFavorite: true },
+                { id: 'd43', name: '去饱和', text: 'desaturation', color: '#0891b2', group: 'color_tone', allowPin: true, allowFavorite: true },
+                { id: 'd44', name: '灰度', text: 'grayscale', color: '#0891b2', group: 'color_tone', allowPin: true, allowFavorite: true },
+                { id: 'd45', name: '粒子', text: 'particles', color: '#0891b2', group: 'particles_energy', allowPin: true, allowFavorite: true },
+                { id: 'd46', name: '闪光颗粒', text: 'sparkles', color: '#0891b2', group: 'particles_energy', allowPin: true, allowFavorite: true },
+                { id: 'd47', name: '火花', text: 'sparks', color: '#0891b2', group: 'particles_energy', allowPin: true, allowFavorite: true },
+                { id: 'd48', name: '余烬', text: 'embers', color: '#0891b2', group: 'particles_energy', allowPin: true, allowFavorite: true },
+                { id: 'd49', name: '烟雾', text: 'smoke', color: '#0891b2', group: 'particles_energy', allowPin: true, allowFavorite: true },
+                { id: 'd50', name: '雾', text: 'fog', color: '#0891b2', group: 'particles_energy', allowPin: true, allowFavorite: true },
+                { id: 'd51', name: '薄雾', text: 'mist', color: '#0891b2', group: 'particles_energy', allowPin: true, allowFavorite: true },
+                { id: 'd52', name: '灰尘', text: 'dust', color: '#0891b2', group: 'particles_energy', allowPin: true, allowFavorite: true },
+                { id: 'd53', name: '雪花粒子', text: 'snow particles', color: '#0891b2', group: 'particles_energy', allowPin: true, allowFavorite: true },
+                { id: 'd54', name: '雨滴粒子', text: 'rain particles', color: '#0891b2', group: 'particles_energy', allowPin: true, allowFavorite: true },
+                { id: 'd55', name: '魔法阵', text: 'magic circle', color: '#0891b2', group: 'particles_energy', allowPin: true, allowFavorite: true },
+                { id: 'd56', name: '光环', text: 'aura', color: '#0891b2', group: 'particles_energy', allowPin: true, allowFavorite: true },
+                { id: 'd57', name: '能量场', text: 'energy field', color: '#0891b2', group: 'particles_energy', allowPin: true, allowFavorite: true },
+                { id: 'd58', name: '能量光束', text: 'energy beam', color: '#0891b2', group: 'particles_energy', allowPin: true, allowFavorite: true },
+                { id: 'd59', name: '光束', text: 'beam of light', color: '#0891b2', group: 'particles_energy', allowPin: true, allowFavorite: true },
+                { id: 'd60', name: '闪电', text: 'lightning', color: '#0891b2', group: 'particles_energy', allowPin: true, allowFavorite: true },
+                { id: 'd61', name: '雷电', text: 'thunderbolt', color: '#0891b2', group: 'particles_energy', allowPin: true, allowFavorite: true },
+                { id: 'd62', name: '冲击波', text: 'shockwave', color: '#0891b2', group: 'particles_energy', allowPin: true, allowFavorite: true },
+                { id: 'd63', name: '爆炸', text: 'explosion', color: '#0891b2', group: 'particles_energy', allowPin: true, allowFavorite: true },
+                { id: 'd64', name: '火球', text: 'fireball', color: '#0891b2', group: 'particles_energy', allowPin: true, allowFavorite: true },
+                { id: 'd65', name: '尾迹效果', text: 'trail effect', color: '#0891b2', group: 'particles_energy', allowPin: true, allowFavorite: true },
+                { id: 'd66', name: '星光粒子', text: 'star particles', color: '#0891b2', group: 'particles_energy', allowPin: true, allowFavorite: true },
+                { id: 'd67', name: '闪光轨迹', text: 'sparkle trail', color: '#0891b2', group: 'particles_energy', allowPin: true, allowFavorite: true },
+                { id: 'd68', name: '粒子喷发', text: 'particle burst', color: '#0891b2', group: 'particles_energy', allowPin: true, allowFavorite: true },
+                { id: 'd69', name: '发光粒子', text: 'glow particles', color: '#0891b2', group: 'particles_energy', allowPin: true, allowFavorite: true },
+                { id: 'd70', name: '霾', text: 'haze', color: '#0891b2', group: 'particles_energy', allowPin: true, allowFavorite: true },
+                { id: 'd71', name: '阳光', text: 'sunlight', color: '#0891b2', group: 'weather_nature', allowPin: true, allowFavorite: true },
+                { id: 'd72', name: '月光', text: 'moonlight', color: '#0891b2', group: 'weather_nature', allowPin: true, allowFavorite: true },
+                { id: 'd73', name: '星空', text: 'starry sky', color: '#0891b2', group: 'weather_nature', allowPin: true, allowFavorite: true },
+                { id: 'd74', name: '彩虹', text: 'rainbow', color: '#0891b2', group: 'weather_nature', allowPin: true, allowFavorite: true },
+                { id: 'd75', name: '雨', text: 'rain', color: '#0891b2', group: 'weather_nature', allowPin: true, allowFavorite: true },
+                { id: 'd76', name: '下雪', text: 'snowfall', color: '#0891b2', group: 'weather_nature', allowPin: true, allowFavorite: true },
+                { id: 'd77', name: '暴雪', text: 'blizzard', color: '#0891b2', group: 'weather_nature', allowPin: true, allowFavorite: true },
+                { id: 'd78', name: '毛毛雨', text: 'drizzle', color: '#0891b2', group: 'weather_nature', allowPin: true, allowFavorite: true },
+                { id: 'd79', name: '风暴', text: 'storm', color: '#0891b2', group: 'weather_nature', allowPin: true, allowFavorite: true },
+                { id: 'd80', name: '雷暴', text: 'thunderstorm', color: '#0891b2', group: 'weather_nature', allowPin: true, allowFavorite: true },
+                { id: 'd81', name: '风效', text: 'wind effect', color: '#0891b2', group: 'weather_nature', allowPin: true, allowFavorite: true },
+                { id: 'd82', name: '沙尘暴', text: 'sandstorm', color: '#0891b2', group: 'weather_nature', allowPin: true, allowFavorite: true },
+                { id: 'd83', name: '日出', text: 'sunrise', color: '#0891b2', group: 'weather_nature', allowPin: true, allowFavorite: true },
+                { id: 'd84', name: '日落', text: 'sunset', color: '#0891b2', group: 'weather_nature', allowPin: true, allowFavorite: true },
+                { id: 'd85', name: '阴天', text: 'overcast', color: '#0891b2', group: 'weather_nature', allowPin: true, allowFavorite: true },
+                { id: 'd86', name: '多云', text: 'cloudy', color: '#0891b2', group: 'weather_nature', allowPin: true, allowFavorite: true },
+                { id: 'd87', name: '晴空', text: 'clear sky', color: '#0891b2', group: 'weather_nature', allowPin: true, allowFavorite: true },
+                { id: 'd88', name: '运动模糊', text: 'motion blur', color: '#0891b2', group: 'motion_blur', allowPin: true, allowFavorite: true },
+                { id: 'd89', name: '速度线', text: 'speed lines', color: '#0891b2', group: 'motion_blur', allowPin: true, allowFavorite: true },
+                { id: 'd90', name: '拖影帧', text: 'smear frame', color: '#0891b2', group: 'motion_blur', allowPin: true, allowFavorite: true },
+                { id: 'd91', name: '长曝光', text: 'long exposure', color: '#0891b2', group: 'motion_blur', allowPin: true, allowFavorite: true },
+                { id: 'd92', name: '慢速快门', text: 'slow shutter', color: '#0891b2', group: 'motion_blur', allowPin: true, allowFavorite: true },
+                { id: 'd93', name: '残像', text: 'afterimage', color: '#0891b2', group: 'motion_blur', allowPin: true, allowFavorite: true },
+                { id: 'd94', name: '重影', text: 'ghosting', color: '#0891b2', group: 'motion_blur', allowPin: true, allowFavorite: true },
+                { id: 'd95', name: '径向模糊', text: 'radial blur', color: '#0891b2', group: 'motion_blur', allowPin: true, allowFavorite: true },
+                { id: 'd96', name: '变焦模糊', text: 'zoom blur', color: '#0891b2', group: 'motion_blur', allowPin: true, allowFavorite: true },
+                { id: 'd97', name: '移轴模糊', text: 'tilt-shift blur', color: '#0891b2', group: 'motion_blur', allowPin: true, allowFavorite: true },
+                { id: 'd98', name: '景深', text: 'depth of field', color: '#0891b2', group: 'motion_blur', allowPin: true, allowFavorite: true },
+                { id: 'd99', name: '散景', text: 'bokeh', color: '#0891b2', group: 'motion_blur', allowPin: true, allowFavorite: true },
+                { id: 'd100', name: '对焦模糊', text: 'focus blur', color: '#0891b2', group: 'motion_blur', allowPin: true, allowFavorite: true },
+                { id: 'd101', name: '背景虚化', text: 'background blur', color: '#0891b2', group: 'motion_blur', allowPin: true, allowFavorite: true },
+                { id: 'd102', name: '前景虚化', text: 'foreground blur', color: '#0891b2', group: 'motion_blur', allowPin: true, allowFavorite: true },
+                { id: 'd103', name: '机位震动', text: 'camera shake', color: '#0891b2', group: 'motion_blur', allowPin: true, allowFavorite: true },
+                { id: 'd104', name: '时间切片', text: 'time slice', color: '#0891b2', group: 'motion_blur', allowPin: true, allowFavorite: true },
+                { id: 'd105', name: '定格画面', text: 'freeze frame', color: '#0891b2', group: 'motion_blur', allowPin: true, allowFavorite: true },
+                { id: 'd106', name: '胶片颗粒', text: 'film grain', color: '#0891b2', group: 'textures_overlays', allowPin: true, allowFavorite: true },
+                { id: 'd107', name: '噪点纹理', text: 'noise texture', color: '#0891b2', group: 'textures_overlays', allowPin: true, allowFavorite: true },
+                { id: 'd108', name: '半色调', text: 'halftone', color: '#0891b2', group: 'textures_overlays', allowPin: true, allowFavorite: true },
+                { id: 'd109', name: '抖动', text: 'dithering', color: '#0891b2', group: 'textures_overlays', allowPin: true, allowFavorite: true },
+                { id: 'd110', name: '扫描线', text: 'scanlines', color: '#0891b2', group: 'textures_overlays', allowPin: true, allowFavorite: true },
+                { id: 'd111', name: '显像管效果', text: 'CRT effect', color: '#0891b2', group: 'textures_overlays', allowPin: true, allowFavorite: true },
+                { id: 'd112', name: '录像带效果', text: 'VHS effect', color: '#0891b2', group: 'textures_overlays', allowPin: true, allowFavorite: true },
+                { id: 'd113', name: '故障效果', text: 'glitch', color: '#0891b2', group: 'textures_overlays', allowPin: true, allowFavorite: true },
+                { id: 'd114', name: '变形扭曲', text: 'distortion', color: '#0891b2', group: 'textures_overlays', allowPin: true, allowFavorite: true },
+                { id: 'd115', name: '色差', text: 'chromatic aberration', color: '#0891b2', group: 'textures_overlays', allowPin: true, allowFavorite: true },
+                { id: 'd116', name: '暗角', text: 'vignette', color: '#0891b2', group: 'textures_overlays', allowPin: true, allowFavorite: true },
+                { id: 'd117', name: '水彩效果', text: 'watercolor effect', color: '#0891b2', group: 'textures_overlays', allowPin: true, allowFavorite: true },
+                { id: 'd118', name: '油画效果', text: 'oil paint effect', color: '#0891b2', group: 'textures_overlays', allowPin: true, allowFavorite: true },
+                { id: 'd119', name: '速写效果', text: 'sketch effect', color: '#0891b2', group: 'textures_overlays', allowPin: true, allowFavorite: true },
+                { id: 'd120', name: '像素化', text: 'pixelation', color: '#0891b2', group: 'textures_overlays', allowPin: true, allowFavorite: true },
+                { id: 'd121', name: '马赛克', text: 'mosaic', color: '#0891b2', group: 'textures_overlays', allowPin: true, allowFavorite: true },
+                { id: 'd122', name: '色阶分段', text: 'posterization', color: '#0891b2', group: 'textures_overlays', allowPin: true, allowFavorite: true },
+                { id: 'd123', name: '网点贴图', text: 'comic screentone', color: '#0891b2', group: 'textures_overlays', allowPin: true, allowFavorite: true },
+                { id: 'd124', name: '纸张纹理', text: 'paper texture', color: '#0891b2', group: 'textures_overlays', allowPin: true, allowFavorite: true },
+                { id: 'd125', name: '墨迹晕染', text: 'ink bleed', color: '#0891b2', group: 'textures_overlays', allowPin: true, allowFavorite: true },
+                { id: 'd126', name: '漏光', text: 'light leak', color: '#0891b2', group: 'textures_overlays', allowPin: true, allowFavorite: true },
+                { id: 'd127', name: '灼印', text: 'burn-in', color: '#0891b2', group: 'textures_overlays', allowPin: true, allowFavorite: true },
+                { id: 'd128', name: '双重曝光', text: 'double exposure', color: '#0891b2', group: 'textures_overlays', allowPin: true, allowFavorite: true },
+                { id: 'd129', name: '强阴影', text: 'strong shadow', color: '#0891b2', group: 'shadows_reflections', allowPin: true, allowFavorite: true },
+                { id: 'd130', name: '软阴影', text: 'soft shadow', color: '#0891b2', group: 'shadows_reflections', allowPin: true, allowFavorite: true },
+                { id: 'd131', name: '投影', text: 'cast shadow', color: '#0891b2', group: 'shadows_reflections', allowPin: true, allowFavorite: true },
+                { id: 'd132', name: '阴影投射', text: 'drop shadow', color: '#0891b2', group: 'shadows_reflections', allowPin: true, allowFavorite: true },
+                { id: 'd133', name: '剪影', text: 'silhouette', color: '#0891b2', group: 'shadows_reflections', allowPin: true, allowFavorite: true },
+                { id: 'd134', name: '反射', text: 'reflection', color: '#0891b2', group: 'shadows_reflections', allowPin: true, allowFavorite: true },
+                { id: 'd135', name: '镜像反射', text: 'mirror reflection', color: '#0891b2', group: 'shadows_reflections', allowPin: true, allowFavorite: true },
+                { id: 'd136', name: '折射', text: 'refraction', color: '#0891b2', group: 'shadows_reflections', allowPin: true, allowFavorite: true },
+                { id: 'd137', name: '焦散', text: 'caustics', color: '#0891b2', group: 'shadows_reflections', allowPin: true, allowFavorite: true },
+                { id: 'd138', name: '明暗对照', text: 'chiaroscuro', color: '#0891b2', group: 'shadows_reflections', allowPin: true, allowFavorite: true },
+                { id: 'd139', name: '发光', text: 'glowing', color: '#0891b2', group: 'glow_fluorescence', allowPin: true, allowFavorite: true },
+                { id: 'd140', name: '霓虹发光', text: 'neon glow', color: '#0891b2', group: 'glow_fluorescence', allowPin: true, allowFavorite: true }
             ],
             negative: [
                 { id: 'n1', name: '低质量', text: 'low quality', color: '#4b5563', group: 'default', allowPin: true, allowFavorite: true },
@@ -1902,6 +2186,32 @@
                 console.error('加载数据时出错:', error);
             }
             
+            // 优先从 CSV 同步五个分类（形象/style、姿态/character、效果/details、服装/lighting、R18/r18）
+            try {
+                if (typeof syncTagsFromCSV === 'function') {
+                    // 形象（中文文件名，来自 tag 子目录）
+                    syncTagsFromCSV('style', 'tag/人物.csv');
+                    // 姿态（中文文件名，来自 tag 子目录）
+                    syncTagsFromCSV('character', 'tag/动作.csv');
+                    // 效果（中文文件名，来自 tag 子目录）
+                    syncTagsFromCSV('details', 'tag/效果.csv');
+                    // 风格（中文文件名，来自 tag 子目录）- 先清空原有标签，再从CSV同步
+                    if (settings && settings.tags) settings.tags['negative'] = [];
+                    if (settings && settings.groups) settings.groups['negative'] = [];
+                    syncTagsFromCSV('negative', 'tag/风格.csv');
+                    // 服装（中文文件名，来自 tag 子目录）- 先清空原有标签，再从CSV同步
+                    if (settings && settings.tags) settings.tags['lighting'] = [];
+                    if (settings && settings.groups) settings.groups['lighting'] = [];
+                    syncTagsFromCSV('lighting', 'tag/服装.csv');
+                    // R18 标签（中文文件名，来自 tag 子目录）- 先清空原有标签，再从CSV同步
+                    if (settings && settings.tags) settings.tags['r18'] = [];
+                    if (settings && settings.groups) settings.groups['r18'] = [];
+                    syncTagsFromCSV('r18', 'tag/R18.csv');
+                }
+            } catch (error) {
+                console.error('CSV 同步分类标签时出错:', error);
+            }
+
             try {
                 initializeEventListeners();
             } catch (error) {
@@ -1977,7 +2287,7 @@
             
             try {
                 if (typeof showNotification === 'function') {
-                    showNotification('欢迎使用 Mayi Prompt UI v3.4.6', 'success');
+                    showNotification('欢迎使用 Mayi Prompt UI 3.4.9', 'success');
                 }
             } catch (error) {
                 console.error('显示通知时出错:', error);
@@ -2073,6 +2383,143 @@
             }
 
             console.log('数据加载完成');
+        }
+
+        // CSV 解析与同步通用方法
+        function parseTagsFromCSV(csvText, categoryId) {
+            try {
+                const text = csvText.replace(/^\uFEFF/, '').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+                const rawLines = text.split('\n').filter(l => l.trim().length > 0);
+                if (rawLines.length === 0) return { groups: [], tags: [] };
+
+                const splitWith = (line, delim) => {
+                    const result = [];
+                    let cur = '';
+                    let inQuotes = false;
+                    for (let i = 0; i < line.length; i++) {
+                        const ch = line[i];
+                        if (ch === '"') {
+                            if (inQuotes && line[i + 1] === '"') { cur += '"'; i++; }
+                            else { inQuotes = !inQuotes; }
+                        } else if (ch === delim && !inQuotes) {
+                            result.push(cur.trim());
+                            cur = '';
+                        } else {
+                            cur += ch;
+                        }
+                    }
+                    result.push(cur.trim());
+                    return result;
+                };
+
+                const delimiters = [',', '，', ';'];
+                let headerFields = null;
+                let delimiter = ',';
+                for (let d of delimiters) {
+                    const fields = splitWith(rawLines[0], d);
+                    if (fields.length >= 3) { headerFields = fields; delimiter = d; break; }
+                }
+                if (!headerFields) {
+                    console.warn('CSV 表头不匹配，无法解析分隔符');
+                    return { groups: [], tags: [] };
+                }
+
+                const norm = headerFields.map(h => h.replace(/^"|"$/g, '').trim().toLowerCase());
+                const idxGroup = norm.findIndex(h => ['分类','分组','group','category'].includes(h));
+                const idxEn = norm.findIndex(h => ['英文标签','english','en','tag'].includes(h));
+                const idxZh = norm.findIndex(h => ['中文翻译','中文','zh','name','translation'].includes(h));
+                if (idxGroup === -1) console.warn('CSV 未提供“分类/分组”列');
+                if (idxEn === -1) console.warn('CSV 未提供“英文标签”列');
+                if (idxZh === -1) console.warn('CSV 未提供“中文翻译/名称”列');
+
+                const groupsMap = new Map();
+                const tags = [];
+                for (let i = 1; i < rawLines.length; i++) {
+                    const cols = splitWith(rawLines[i], delimiter);
+                    if (Math.max(idxGroup, idxEn, idxZh) >= cols.length) {
+                        const groupNameOnly = (idxGroup >= 0 && cols[idxGroup]) ? cols[idxGroup].replace(/^"|"$/g, '').trim() : '';
+                        if (groupNameOnly) {
+                            const gid = groupNameOnly;
+                            if (!groupsMap.has(gid)) {
+                                groupsMap.set(gid, { id: gid, name: groupNameOnly, description: groupNameOnly });
+                            }
+                        }
+                        continue;
+                    }
+
+                    const groupName = (idxGroup >= 0 ? cols[idxGroup] : '').replace(/^"|"$/g, '').trim();
+                    const english = (idxEn >= 0 ? cols[idxEn] : '').replace(/^"|"$/g, '').trim().replace(/^`|`$/g, '');
+                    const chinese = (idxZh >= 0 ? cols[idxZh] : '').replace(/^"|"$/g, '').trim();
+
+                    if (groupName) {
+                        const gid = groupName;
+                        if (!groupsMap.has(gid)) groupsMap.set(gid, { id: gid, name: groupName, description: groupName });
+                    }
+                    if (!english || !chinese) continue;
+
+                    const gid = groupName || 'default';
+                    const tagId = `${categoryId}_${english}`;
+                    tags.push({
+                        id: tagId,
+                        name: chinese,
+                        text: english,
+                        color: '#2563eb',
+                        group: gid,
+                        allowPin: true,
+                        allowFavorite: true
+                    });
+                }
+
+                const seen = new Set();
+                const uniqueTags = [];
+                for (const t of tags) {
+                    const key = `${t.text}|${t.group}`;
+                    if (!seen.has(key)) { seen.add(key); uniqueTags.push(t); }
+                }
+
+                return { groups: Array.from(groupsMap.values()), tags: uniqueTags };
+            } catch (err) {
+                console.error('CSV 解析失败:', err);
+                return { groups: [], tags: [] };
+            }
+        }
+
+        async function syncTagsFromCSV(categoryId, fileName) {
+            try {
+                const resp = await fetch(fileName);
+                if (!resp.ok) {
+                    console.warn(`${fileName} 未找到，跳过 ${categoryId} 同步`);
+                    return;
+                }
+                const csv = await resp.text();
+                const { groups, tags } = parseTagsFromCSV(csv, categoryId);
+                if (!settings.groups) settings.groups = {};
+                if (!settings.tags) settings.tags = {};
+                const finalGroups = (groups && groups.length) ? groups : [{ id: 'default', name: '默认分组', description: '默认分组' }];
+                const finalTags = tags || [];
+                // 严格覆盖：分组按 CSV 分类严格设置（即使没有标签行也创建分组）
+                defaultGroups[categoryId] = finalGroups;
+                defaultTags[categoryId] = finalTags;
+                settings.groups[categoryId] = finalGroups;
+                settings.tags[categoryId] = finalTags;
+
+                // 如果当前选中的分组在新的分组集合中不存在，则自动回退到 "all"
+                if (settings.currentTab === categoryId) {
+                    const newGroupIds = new Set(finalGroups.map(g => g.id));
+                    if (!newGroupIds.has(settings.currentGroup)) {
+                        settings.currentGroup = 'all';
+                    }
+                }
+
+                saveData();
+                console.log(`已从 ${fileName} 同步 ${categoryId}，分组 ${finalGroups.length}，标签 ${finalTags.length}`);
+                if (settings.currentTab === categoryId) {
+                    if (typeof renderGroupSidebar === 'function') renderGroupSidebar();
+                    if (typeof renderTags === 'function') renderTags();
+                }
+            } catch (e) {
+                console.error(`同步 ${categoryId} 分类标签失败:`, e);
+            }
         }
 
         function saveData() {
@@ -2220,6 +2667,29 @@
                 if (modal) modal.classList.remove('show');
             });
 
+            // 标签管理标题三击切换 R18 分组显示/隐藏
+            let tagHeaderClickCount = 0;
+            let tagHeaderClickResetTimer = null;
+            const handleTagManagementTripleClick = () => {
+                tagHeaderClickCount++;
+                if (tagHeaderClickResetTimer) clearTimeout(tagHeaderClickResetTimer);
+                tagHeaderClickResetTimer = setTimeout(() => { tagHeaderClickCount = 0; }, 800);
+                if (tagHeaderClickCount >= 3) {
+                    tagHeaderClickCount = 0;
+                    settings.showR18Groups = !settings.showR18Groups;
+                    if (typeof saveData === 'function') saveData();
+                    // 先重渲染标签页按钮，保证R18页即时显隐
+                    if (typeof renderTagTabButtons === 'function') renderTagTabButtons();
+                    // 再刷新分组侧栏和标签内容
+                    if (typeof renderGroupSidebar === 'function') renderGroupSidebar();
+                    if (typeof renderTags === 'function') renderTags();
+                    if (typeof showNotification === 'function') {
+                        showNotification(settings.showR18Groups ? '已显示 R18 分组' : '已隐藏 R18 分组', 'info');
+                    }
+                }
+            };
+            safeAddEventListener('tagManagementHeader', 'click', handleTagManagementTripleClick);
+
             // 评分星星事件 - 安全处理
             const setupRatingStars = (containerId, ratingInputId) => {
                 const container = document.getElementById(containerId);
@@ -2296,6 +2766,10 @@
             if (!settings.currentGroup) {
                 settings.currentGroup = 'all'; // 默认显示所有分组
             }
+            // 启用搜索与提示词候选增强
+            setupTagSearchSuggestions();
+            setupPresetSearchSuggestions();
+            setupPromptSuggestions();
         }
 
         function setupModalClickOutsideClose() {
@@ -2452,7 +2926,7 @@
                     '</div>' + descriptionHtml;
                 
                 item.onclick = function() {
-                    switchGroup(group.id);
+                    switchGroup(this.dataset.groupId);
                 };
                 
                 container.appendChild(item);
@@ -2506,6 +2980,12 @@
 
             // 过滤掉favorites分类，只渲染普通一级分类
             settings.mainCategories.filter(category => category.id !== 'favorites').forEach(category => {
+                // 当R18分类隐藏时，跳过渲染R18标签页
+                if (category.id === 'r18' && !settings.showR18Groups) {
+                    // 若当前tab为R18，切换到'style'避免空状态
+                    if (settings.currentTab === 'r18') settings.currentTab = 'style';
+                    return;
+                }
                 let tagCount = settings.tags[category.id] ? settings.tags[category.id].length : 0;
                 
                 const button = document.createElement('button');
@@ -2554,6 +3034,283 @@
             });
 
             console.log('Prompt标签页按钮渲染完成');
+        }
+        
+        // 搜索候选与跳转、高亮 & 提示词同步
+        function setupTagSearchSuggestions() {
+            const input = document.getElementById('tagSearchInput');
+            if (!input) return;
+            const onInput = debounce(function() {
+                const q = this.value.trim().toLowerCase();
+                currentTagSearch = q;
+                renderTags();
+                if (!q) { hideSuggestionDropdown(input); return; }
+                const items = findTagsByKeyword(q).slice(0, 8);
+                showSuggestionDropdown(input, items, function(item) {
+                    hideSuggestionDropdown(input);
+                    input.value = '';
+                    currentTagSearch = '';
+                    jumpToTag(item.category, item.groupId, item.id);
+                });
+            }, 200);
+            input.addEventListener('input', onInput);
+            input.addEventListener('blur', () => setTimeout(() => hideSuggestionDropdown(input), 150));
+        }
+        
+        function setupPresetSearchSuggestions() {
+            const input = document.getElementById('presetSearchInput');
+            if (!input) return;
+            const onInput = debounce(function() {
+                const q = this.value.trim().toLowerCase();
+                currentPresetSearch = q;
+                renderPresets();
+                if (!q) { hideSuggestionDropdown(input); return; }
+                const items = findPresetsByKeyword(q).slice(0, 8);
+                showSuggestionDropdown(input, items, function(item) {
+                    hideSuggestionDropdown(input);
+                    input.value = '';
+                    currentPresetSearch = '';
+                    jumpToPreset(item.category, item.id);
+                });
+            }, 200);
+            input.addEventListener('input', onInput);
+            input.addEventListener('blur', () => setTimeout(() => hideSuggestionDropdown(input), 150));
+        }
+        
+        function setupPromptSuggestions() {
+            const textarea = document.getElementById('positivePrompt');
+            if (!textarea) return;
+            
+            const onInput = debounce(function() {
+                // 同步标签联动
+                syncSelectedTagsFromPrompt();
+                
+                // 仅在输入片段存在时展示候选（逗号分隔的最后一段）
+                const caret = textarea.selectionStart || 0;
+                const before = (textarea.value || '').slice(0, caret);
+                const fragment = before.split(',').pop().trim().toLowerCase();
+                if (!fragment) { hideSuggestionDropdown(textarea); return; }
+                const items = findTagsByKeyword(fragment).slice(0, 8);
+                
+                // 显示候选，点击后用候选替换当前输入片段，并自动添加英文逗号
+                showSuggestionDropdown(textarea, items, function(item) {
+                    hideSuggestionDropdown(textarea);
+                    const start = textarea.selectionStart || 0;
+                    const end = textarea.selectionEnd || start;
+                    const value = textarea.value;
+                    const before = value.slice(0, start);
+                    const after = value.slice(end);
+                    // 找到最后一个逗号，定位本次输入片段的起始位置
+                    const lastComma = before.lastIndexOf(',');
+                    let tokenStart = lastComma >= 0 ? lastComma + 1 : 0;
+                    // 跳过片段起始处的空白
+                    while (tokenStart < before.length && /\s/.test(before[tokenStart])) tokenStart++;
+                    let newBefore = value.slice(0, tokenStart).replace(/\s+$/, '');
+                    // 保证逗号后只有一个空格；如果不是以逗号结尾且有内容，则补充", "
+                    if (newBefore) {
+                        if (/,$/.test(newBefore)) {
+                            if (!/\s$/.test(newBefore)) newBefore += ' ';
+                        } else {
+                            newBefore += ', ';
+                        }
+                    }
+                    const insertionText = item.text || item.label || '';
+                    // 如果后续不以逗号开始，则在插入后补充", "，保证分隔
+                    const needCommaAfter = after.length === 0 || !/^\s*,/.test(after);
+                    const suffix = needCommaAfter ? ', ' : '';
+                    textarea.value = newBefore + insertionText + suffix + after;
+                    const evt = new Event('input', { bubbles: true });
+                    textarea.dispatchEvent(evt);
+                });
+            }, 220);
+            
+            textarea.addEventListener('input', onInput);
+            textarea.addEventListener('blur', () => setTimeout(() => hideSuggestionDropdown(textarea), 150));
+        }
+        
+        function jumpToTag(categoryId, groupId, tagId) {
+            switchTagTab(categoryId);
+            if (groupId) switchGroup(groupId);
+            setTimeout(() => scrollToTagAfterRender(tagId), 50);
+        }
+        
+        function scrollToTagAfterRender(tagId) {
+            let tries = 0;
+            const maxTries = 20;
+            const tryFind = () => {
+                const el = document.querySelector('#tagsContent [data-tag-id="' + tagId + '"]');
+                if (el) {
+                    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    el.classList.add('ring-4');
+                    el.classList.add('ring-blue-400');
+                    setTimeout(() => { el.classList.remove('ring-4'); el.classList.remove('ring-blue-400'); }, 1500);
+                    return;
+                }
+                if (++tries < maxTries) setTimeout(tryFind, 100);
+            };
+            tryFind();
+        }
+        
+        function jumpToPreset(categoryId, presetId) {
+            switchPresetTab(categoryId);
+            setTimeout(() => scrollToPresetAfterRender(presetId), 50);
+        }
+        
+        function scrollToPresetAfterRender(presetId) {
+            let tries = 0;
+            const maxTries = 20;
+            const tryFind = () => {
+                const el = document.querySelector('#presetContent .preset-item[data-preset-id="' + presetId + '"]');
+                if (el) {
+                    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    el.style.outline = '3px solid #3B82F6';
+                    setTimeout(() => { el.style.outline = ''; }, 1500);
+                    return;
+                }
+                if (++tries < maxTries) setTimeout(tryFind, 100);
+            };
+            tryFind();
+        }
+        
+        function parseTokenWeight(raw) {
+            let text = raw.trim();
+            let weight = 1.0;
+            const parenMatch = text.match(/^\((.+?):([0-9]+(?:\.[0-9]+)?)\)$/);
+            if (parenMatch) {
+                text = parenMatch[1].trim();
+                weight = parseFloat(parenMatch[2]);
+                return { text, weight };
+            }
+            const colonMatch = text.match(/^(.*?):\s*([0-9]+(?:\.[0-9]+)?)$/);
+            if (colonMatch) {
+                text = colonMatch[1].trim();
+                weight = parseFloat(colonMatch[2]);
+            }
+            return { text, weight };
+        }
+        
+        function findTagByText(text) {
+            const target = (text || '').trim().toLowerCase();
+            if (!target) return null;
+            for (const categoryId in settings.tags) {
+                const tags = settings.tags[categoryId] || [];
+                for (const tag of tags) {
+                    if ((tag.text || '').toLowerCase() === target) {
+                        return { ...tag, category: categoryId };
+                    }
+                }
+            }
+            return null;
+        }
+        
+        function findTagsByKeyword(keyword) {
+            const q = (keyword || '').trim().toLowerCase();
+            const items = [];
+            (settings.mainCategories || []).forEach(cat => {
+                const categoryId = cat.id;
+                const categoryName = cat.name;
+                const tags = settings.tags[categoryId] || [];
+                const groups = settings.groups[categoryId] || [];
+                tags.forEach(tag => {
+                    if ((tag.name || '').toLowerCase().includes(q) || (tag.text || '').toLowerCase().includes(q)) {
+                        const group = groups.find(g => g.id === tag.group);
+                        items.push({
+                            type: 'tag', id: tag.id, text: tag.text, name: tag.name,
+                            category: categoryId, categoryName,
+                            groupId: tag.group, groupName: group ? group.name : '未分组',
+                            label: tag.text,
+                            secondary: `${categoryName} · ${group ? group.name : '未分组'}`
+                        });
+                    }
+                });
+            });
+            return items;
+        }
+        
+        function findPresetsByKeyword(keyword) {
+            const q = (keyword || '').trim().toLowerCase();
+            const items = [];
+            (settings.presetCategories || []).forEach(cat => {
+                const categoryId = cat.id;
+                const categoryName = cat.name;
+                const presets = settings.presets[categoryId] || [];
+                presets.forEach(preset => {
+                    const nameMatch = (preset.name || '').toLowerCase().includes(q);
+                    const descMatch = (preset.description || '').toLowerCase().includes(q);
+                    const promptMatch = (preset.prompt || '').toLowerCase().includes(q);
+                    if (nameMatch || descMatch || promptMatch) {
+                        items.push({
+                            type: 'preset', id: preset.id, name: preset.name,
+                            category: categoryId, categoryName,
+                            label: preset.name,
+                            secondary: `${categoryName}`
+                        });
+                    }
+                });
+            });
+            return items;
+        }
+        
+        function syncSelectedTagsFromPrompt() {
+            const textarea = document.getElementById('positivePrompt');
+            if (!textarea) return;
+            const raw = textarea.value || '';
+            const tokens = raw.split(',').map(t => t.trim()).filter(Boolean);
+            const nextSelected = [];
+            tokens.forEach(tok => {
+                const { text, weight } = parseTokenWeight(tok);
+                const found = findTagByText(text);
+                const safeWeight = Math.max(0.1, Math.min(2.0, weight || 1.0));
+                if (found) {
+                    nextSelected.push({ id: found.id, name: found.name, text: found.text, weight: safeWeight });
+                } else {
+                    nextSelected.push({ id: 'custom:' + text.toLowerCase(), name: text, text: text, weight: safeWeight });
+                }
+            });
+            settings.selectedTags = nextSelected;
+            saveData();
+            updateSelectedTagsDisplay();
+            renderTags();
+        }
+        
+        function showSuggestionDropdown(anchorInput, items, onSelect) {
+            const parent = anchorInput.offsetParent || anchorInput.parentElement || anchorInput;
+            const id = anchorInput.id + '-suggestions';
+            let dropdown = parent.querySelector('#' + id);
+            if (!dropdown) {
+                dropdown = document.createElement('div');
+                dropdown.id = id;
+                dropdown.className = 'suggestion-dropdown';
+                parent.appendChild(dropdown);
+            }
+            // 确保定位参照父容器，避免覆盖到输入框内部
+            if (getComputedStyle(parent).position === 'static') {
+                parent.style.position = 'relative';
+            }
+            dropdown.innerHTML = '';
+            if (!items || items.length === 0) {
+                dropdown.innerHTML = '<div class="suggestion-empty">无匹配项</div>';
+                return;
+            }
+            items.forEach(item => {
+                const el = document.createElement('div');
+                el.className = 'suggestion-item';
+                el.innerHTML = `<span class="suggestion-primary">${escapeHtml(item.label || '')}</span><span class="suggestion-secondary">${escapeHtml(item.secondary || '')}</span>`;
+                el.addEventListener('mousedown', function(e) { e.preventDefault(); onSelect(item); });
+                dropdown.appendChild(el);
+            });
+            // 让下拉严格对齐到输入框下方且宽度与输入框一致
+            dropdown.style.left = anchorInput.offsetLeft + 'px';
+            dropdown.style.top = (anchorInput.offsetTop + anchorInput.offsetHeight) + 'px';
+            dropdown.style.width = anchorInput.offsetWidth + 'px';
+            dropdown.style.right = '';
+        }
+        
+        function hideSuggestionDropdown(anchorInput) {
+            const parent = anchorInput.offsetParent || anchorInput.parentElement || anchorInput;
+            const id = anchorInput.id + '-suggestions';
+            const dropdown = parent.querySelector('#' + id);
+            if (dropdown) dropdown.remove();
         }
 
         // 渲染当前分类下的收藏标签的函数
@@ -2695,6 +3452,15 @@
                 if (settings.currentGroup === 'favorites') {
                     renderCategoryFavoriteTags(content, category);
                     // 隐藏加载指示器
+                    if (loadingIndicator) {
+                        loadingIndicator.classList.remove('show');
+                    }
+                    return;
+                }
+                
+                // 全局联动搜索：当存在搜索关键词时进行跨分类渲染
+                if (currentTagSearch) {
+                    renderGlobalSearchTags(content);
                     if (loadingIndicator) {
                         loadingIndicator.classList.remove('show');
                     }
@@ -3029,6 +3795,151 @@
             console.log('收藏标签渲染完成');
         }
 
+        function renderGlobalSearchTags(content) {
+            console.log('正在渲染全局搜索结果...');
+            const searchLower = (currentTagSearch || '').trim().toLowerCase();
+            if (!searchLower) {
+                // 如果没有关键字，回退到正常渲染
+                renderTags();
+                return;
+            }
+
+            let html = '';
+            let hasVisible = false;
+
+            (settings.mainCategories || []).forEach(cat => {
+                const categoryId = cat.id;
+                const categoryName = cat.name;
+                const tags = settings.tags[categoryId] || [];
+                const groups = settings.groups[categoryId] || [{ id: 'default', name: '默认分组', description: '默认分组' }];
+
+                let categoryHtmlSections = '';
+
+                groups.forEach(group => {
+                    let groupTags = tags.filter(tag => tag.group === group.id && (
+                        (tag.name || '').toLowerCase().includes(searchLower) ||
+                        (tag.text || '').toLowerCase().includes(searchLower)
+                    ));
+
+                    // 与常规渲染一致的排序逻辑
+                    groupTags.sort((a, b) => {
+                        const aFavorite = settings.favorites.includes(a.id);
+                        const bFavorite = settings.favorites.includes(b.id);
+                        if (aFavorite !== bFavorite) return aFavorite ? -1 : 1;
+                        if (a.pinned !== b.pinned) return a.pinned ? -1 : 1;
+                        return (a.sortIndex || 0) - (b.sortIndex || 0);
+                    });
+
+                    if (groupTags.length > 0) {
+                        hasVisible = true;
+                        const pinnedCount = groupTags.filter(tag => tag.pinned).length;
+                        categoryHtmlSections += `
+                            <div class="mb-4">
+                                <div class="bg-gradient-to-r from-gray-100 to-gray-200 p-3 rounded-lg mb-2">
+                                    <div class="group-header">
+                                        <h4 class="group-title" data-group-id="${group.id}">${group.name}</h4>
+                                        <div class="group-info">
+                                            ${pinnedCount > 0 ? `<span class="group-count">(${pinnedCount}个置顶)</span>` : ''}
+                                            <span class="group-count">${groupTags.length}个标签</span>
+                                            ${settings.tagEditingMode ? `
+                                                <button class="btn btn-sm add-group-btn" 
+                                                        data-category="${categoryId}" 
+                                                        data-group="${group.id}"
+                                                        title="新建子分组">
+                                                    <i class="fas fa-plus"></i>
+                                                </button>
+                                            ` : ''}
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="pl-4 border-l-2 border-gray-300">
+                                    <div class="tags-container">
+                                        <button class="group-add-button" data-category="${categoryId}" data-group="${group.id}">
+                                            <i class="fas fa-plus"></i>
+                                            新增标签
+                                        </button>
+                                        ${groupTags.map(tag => `
+                                            <div class="tag-item ${isTagSelected(tag.id) ? 'ring-2 ring-yellow-400' : ''} ${tag.pinned ? 'ring-2 ring-red-500' : ''} ${isTagFavorite(tag.id) ? 'ring-2 ring-orange-500' : ''}" 
+                                                 style="background: linear-gradient(135deg, ${tag.color} 0%, ${lightenColor(tag.color, 20)} 100%);"
+                                                 data-tag-id="${tag.id}" 
+                                                 data-category="${categoryId}">
+                                                <span class="mr-2 cursor-move" onclick="event.stopPropagation();">
+                                                    <i class="fas fa-grip-vertical"></i>
+                                                </span>
+                                                <div class="tag-content">
+                                                    <div class="tag-text">${tag.text}</div>
+                                                    <div class="tag-name">${tag.name}</div>
+                                                </div>
+                                                <div class="tag-actions">
+                                                    ${!settings.tagEditingMode ? (
+                                                        `
+                                                        ${tag.allowPin ? `
+                                                            <button class="btn pin-btn ${!tag.allowPin ? 'disabled' : ''}" 
+                                                                    data-tag-id="${tag.id}" 
+                                                                    title="${tag.pinned ? '取消置顶' : '置顶'}"
+                                                                    ${!tag.allowPin ? 'disabled' : ''}>
+                                                                        <i class="fas fa-thumbtack ${tag.pinned ? '' : 'fa-rotate-90'}"></i>
+                                                            </button>
+                                                        ` : ''}
+                                                        ${tag.allowFavorite ? `
+                                                            <button class="btn favorite-btn ${!tag.allowFavorite ? 'disabled' : ''}" 
+                                                                    data-tag-id="${tag.id}" 
+                                                                    title="${isTagFavorite(tag.id) ? '取消收藏' : '收藏'}"
+                                                                    ${!tag.allowFavorite ? 'disabled' : ''}>
+                                                                        <i class="fas fa-star ${isTagFavorite(tag.id) ? '' : 'fa-regular'}"></i>
+                                                            </button>
+                                                        ` : ''}
+                                                        `
+                                                    ) : (
+                                                        `
+                                                        <button class="btn edit-tag-btn" data-tag-id="${tag.id}" data-category="${categoryId}" title="编辑">
+                                                            <i class="fas fa-edit"></i>
+                                                        </button>
+                                                        <button class="btn delete-tag-btn" data-tag-id="${tag.id}" data-category="${categoryId}" title="删除">
+                                                            <i class="fas fa-times"></i>
+                                                        </button>
+                                                        `
+                                                    )}
+                                                </div>
+                                            </div>
+                                        `).join('')}
+                                    </div>
+                                </div>
+                            </div>
+                        `;
+                    }
+                });
+
+                if (categoryHtmlSections) {
+                    html += `
+                        <div class="mb-6">
+                            <div class="bg-gradient-to-r from-sky-100 to-sky-200 p-3 rounded-lg mb-2">
+                                <div class="group-header">
+                                    <h3 class="group-title">${categoryName}</h3>
+                                </div>
+                            </div>
+                            ${categoryHtmlSections}
+                        </div>
+                    `;
+                }
+            });
+
+            if (!hasVisible) {
+                content.innerHTML = `
+                    <div class="empty-state">
+                        <i class="fas fa-search"></i>
+                        <p>未找到跨分类的匹配标签</p>
+                        <small>请调整关键词或创建新标签</small>
+                    </div>
+                `;
+                return;
+            }
+
+            content.innerHTML = html;
+            attachTagEvents();
+            console.log('全局搜索标签渲染完成');
+        }
+
         function attachTagEvents() {
             console.log('正在附加标签事件...');
 
@@ -3137,7 +4048,7 @@
                 btn.addEventListener('click', function(e) {
                     e.stopPropagation();
                     const tagId = this.dataset.tagId;
-                    const category = settings.currentTab;
+                    const category = (this.closest('.tag-item') && this.closest('.tag-item').dataset.category) || settings.currentTab;
                     toggleTagPin(tagId, category);
                 });
             });
@@ -4949,7 +5860,7 @@
                     showNegative: settings.showNegative,
                     favorites: settings.favorites
                 },
-                version: 'v3.4.6',
+                version: '3.4.9',
                 作者: 'Mayi',
                 Github: 'https://clay2001.github.io/Prompt-UI/',
                 exportDate: new Date().toISOString()
@@ -5199,7 +6110,7 @@
         <div class="flex flex-wrap justify-center items-center gap-2">
             <span>© 2025 Mayi Prompt UI</span>
             <span class="mx-2">•</span>
-            <span>版本 v3.4.6</span>
+            <span>版本 3.4.9</span>
             <span class="mx-2">•</span>
             <a href="https://github.com/clay2001/Prompt-UI" target="_blank" rel="noopener" class="text-primary hover:underline">GitHub</a>
         </div>
