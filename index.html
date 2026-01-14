@@ -7,6 +7,7 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css" rel="stylesheet">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/exifreader/dist/exif-reader.min.js"></script>
     <script>
         tailwind.config = {
             theme: {
@@ -1754,7 +1755,7 @@ ${JSON.stringify(tags)}`;
             position: fixed;
             top: 16px;
             right: 16px;
-            z-index: 1000;
+            z-index: 20000;
             font-weight: 600;
             padding: 10px 16px !important;
             border-radius: 8px;
@@ -2030,7 +2031,7 @@ ${JSON.stringify(tags)}`;
             opacity: 1;
             transform: scale(1);
         }
-        }
+        
         
         /* 确保评分和按钮区域在桌面端正确布局 */
         .preset-actions > div {
@@ -2690,6 +2691,7 @@ ${JSON.stringify(tags)}`;
             transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
             box-shadow: 0 5px 30px rgba(0,0,0,0.5);
             border-radius: 8px;
+            pointer-events: auto; /* 允许图片接收鼠标事件，如右键菜单 */
         }
 
         .image-lightbox.active img {
@@ -2752,6 +2754,49 @@ ${JSON.stringify(tags)}`;
             <button id="openSettingsBtn" class="absolute top-0 right-0 btn btn-secondary p-2 rounded-full w-10 h-10 flex items-center justify-center shadow-lg hover:rotate-90 transition-transform duration-500" title="系统设置">
                 <i class="fas fa-cog text-xl"></i>
             </button>
+        </div>
+        
+        <!-- 图片解析模块 -->
+        <div id="image-inspector" class="app-card mb-6 p-4 h-[150px] flex gap-4">
+            <!-- 左侧：图片预览区 -->
+            <div class="w-[30%] h-full relative border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center overflow-hidden bg-gray-50 hover:bg-gray-100 transition-colors cursor-pointer" id="inspector-drop-zone">
+                <input type="file" id="inspector-file-input" class="hidden" accept="image/png,image/jpeg,image/webp,application/json">
+                <div id="inspector-placeholder" class="text-center p-2 pointer-events-none">
+                    <i class="fas fa-cloud-upload-alt text-2xl text-gray-400 mb-2"></i>
+                    <p class="text-xs text-gray-500">拖拽或点击上传图片/工作流<br>(PNG/JPG/WEBP/JSON)</p>
+                </div>
+                <img id="inspector-preview" class="absolute inset-0 w-full h-full object-contain hidden">
+                <div id="inspector-loading" class="absolute inset-0 bg-white/80 flex items-center justify-center hidden">
+                    <i class="fas fa-spinner fa-spin text-primary text-2xl"></i>
+                </div>
+            </div>
+
+            <!-- 中间：元数据显示区 -->
+            <div class="w-[50%] h-full flex flex-col">
+                <div class="flex justify-between items-center mb-1">
+                    <h4 class="text-xs font-semibold text-gray-500 uppercase tracking-wider">正面提示词 (Positive Prompt)</h4>
+                    <span id="inspector-meta-info" class="text-xs text-gray-400"></span>
+                </div>
+                <div class="flex-1 bg-gray-900 rounded-lg p-3 overflow-y-auto custom-scrollbar group relative border border-gray-700">
+                    <pre id="inspector-prompt-display" class="text-xs text-green-400 font-mono whitespace-pre-wrap break-words leading-relaxed select-text">等待图片上传...</pre>
+                    <div class="absolute inset-0 bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer" id="inspector-copy-overlay">
+                        <span class="text-white text-sm font-medium"><i class="fas fa-copy mr-1"></i> 点击复制</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 右侧：操作按钮区 -->
+            <div class="flex-1 flex flex-col gap-2 justify-center h-full">
+                <button id="inspector-btn-use" class="btn btn-primary btn-sm w-full py-2 shadow-sm" title="发送到下方编辑区">
+                    <i class="fas fa-arrow-down mr-1"></i> 填入编辑区
+                </button>
+                <button id="inspector-btn-copy" class="btn btn-info btn-sm w-full py-2 shadow-sm">
+                    <i class="fas fa-copy mr-1"></i> 复制提示词
+                </button>
+                <button id="inspector-btn-clear" class="btn btn-secondary btn-sm w-full py-2 shadow-sm">
+                    <i class="fas fa-trash mr-1"></i> 清空
+                </button>
+            </div>
         </div>
         
         <div class="split-layout-container">
@@ -6043,13 +6088,95 @@ ${JSON.stringify(tags)}`;
         // 放大镜预览相关函数 (Lightbox模式)
         let lightbox = null;
         let lightboxImg = null;
+
+        async function handleImageCopy(src) {
+            // 检查剪贴板API支持
+            if (!navigator.clipboard || !navigator.clipboard.write) {
+                showNotification('当前浏览器不支持图片复制功能', 'error');
+                return;
+            }
+
+            try {
+                showNotification('正在处理图片...', 'info');
+
+                // 获取图片数据
+                const response = await fetch(src);
+                let blob = await response.blob();
+
+                // 为了兼容性，确保图片是PNG格式 (Clipboard API 对 PNG 支持最好)
+                if (blob.type !== 'image/png') {
+                    try {
+                        blob = await convertBlobToPng(blob);
+                    } catch (e) {
+                        console.warn('图片格式转换失败，尝试直接复制:', e);
+                    }
+                }
+
+                // 写入剪贴板
+                const item = new ClipboardItem({
+                    [blob.type]: blob
+                });
+                await navigator.clipboard.write([item]);
+                
+                showNotification('图片已成功复制到剪贴板', 'success');
+            } catch (err) {
+                console.error('复制图片失败:', err);
+                showNotification('复制失败: ' + (err.message || '未知错误'), 'error');
+            }
+        }
+
+        function convertBlobToPng(blob) {
+            return new Promise((resolve, reject) => {
+                const img = new Image();
+                img.onload = () => {
+                    const canvas = document.createElement('canvas');
+                    canvas.width = img.width;
+                    canvas.height = img.height;
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(img, 0, 0);
+                    canvas.toBlob((b) => {
+                        if (b) resolve(b);
+                        else reject(new Error('Canvas conversion failed'));
+                    }, 'image/png');
+                };
+                img.onerror = reject;
+                img.src = URL.createObjectURL(blob);
+            });
+        }
         
+        let lightboxHideTimer = null;
+
         function createLightbox() {
             if (!lightbox) {
                 lightbox = document.createElement('div');
                 lightbox.className = 'image-lightbox';
                 
                 lightboxImg = document.createElement('img');
+                // 添加提示 title
+                lightboxImg.title = "右键点击可复制图片";
+                
+                // 添加右键复制功能
+                lightboxImg.addEventListener('contextmenu', async (e) => {
+                    e.preventDefault();
+                    const src = lightboxImg.src;
+                    if (src) {
+                        await handleImageCopy(src);
+                    }
+                });
+
+                // 鼠标进入图片时清除隐藏定时器
+                lightboxImg.addEventListener('mouseenter', () => {
+                    if (lightboxHideTimer) {
+                        clearTimeout(lightboxHideTimer);
+                        lightboxHideTimer = null;
+                    }
+                });
+
+                // 鼠标离开图片时延迟隐藏
+                lightboxImg.addEventListener('mouseleave', () => {
+                    scheduleHideLightbox();
+                });
+
                 lightbox.appendChild(lightboxImg);
                 
                 // 移除关闭按钮，因为是悬浮触发
@@ -6060,11 +6187,29 @@ ${JSON.stringify(tags)}`;
         
         function showLightbox(src) {
             createLightbox();
-            lightboxImg.src = src;
+            
+            // 清除可能存在的隐藏定时器
+            if (lightboxHideTimer) {
+                clearTimeout(lightboxHideTimer);
+                lightboxHideTimer = null;
+            }
+
+            // 如果图片不同，才更新src
+            if (lightboxImg.src !== src) {
+                lightboxImg.src = src;
+            }
+            
             lightbox.classList.add('active');
             document.body.style.overflow = 'hidden'; // 防止背景滚动
         }
         
+        function scheduleHideLightbox() {
+            // 延迟隐藏，给用户时间移动鼠标到图片上
+            lightboxHideTimer = setTimeout(() => {
+                hideLightbox();
+            }, 300);
+        }
+
         function hideLightbox() {
             if (lightbox) {
                 lightbox.classList.remove('active');
@@ -6202,7 +6347,16 @@ ${JSON.stringify(tags)}`;
                     });
                     
                     btn.addEventListener('mouseleave', function() {
-                        hideLightbox();
+                        scheduleHideLightbox();
+                    });
+
+                    // 添加右键点击按钮复制图片功能
+                    btn.addEventListener('contextmenu', async function(e) {
+                        e.preventDefault();
+                        const src = this.dataset.imageSrc;
+                        if (src) {
+                            await handleImageCopy(src);
+                        }
                     });
                 });
                 
@@ -8769,5 +8923,631 @@ Only return the JSON object.`;
             <i class="fas fa-times"></i>
         </button>
     </div>
+    <script>
+        // 全局初始化逻辑
+        document.addEventListener('DOMContentLoaded', () => {
+            // 添加全局右键事件监听，用于处理放大镜悬浮预览的图片复制
+            document.addEventListener('contextmenu', async (e) => {
+                // 检查Lightbox是否处于激活状态
+                if (typeof lightbox !== 'undefined' && lightbox && lightbox.classList.contains('active')) {
+                    // 如果点击的是图片本身，已经由图片自身的事件处理了
+                    // 但为了保险起见，如果事件源不是图片，或者是图片但没有被阻止（虽然图片上加了preventDefault）
+                    // 我们统一在这里处理"只要Lightbox显示，右键就复制"的逻辑
+                    
+                    // 注意：如果点击的是图片，事件源是img。如果点击的是背景，事件源可能是下层元素(因为pointer-events: none)
+                    // 或者如果是pointer-events: auto的容器，则是容器。
+                    // 现在的CSS: lightbox容器是pointer-events: none，所以点击背景其实是点击了页面下方的元素。
+                    // 但是，我们希望拦截这个右键。
+                    
+                    e.preventDefault();
+                    
+                    if (lightboxImg && lightboxImg.src) {
+                        await handleImageCopy(lightboxImg.src);
+                    }
+                }
+            });
+        });
+    </script>
+<script>
+    // ==========================================
+    // Image Inspector Module
+    // ==========================================
+    (function() {
+        const dropZone = document.getElementById('inspector-drop-zone');
+        const fileInput = document.getElementById('inspector-file-input');
+        const preview = document.getElementById('inspector-preview');
+        const placeholder = document.getElementById('inspector-placeholder');
+        const loading = document.getElementById('inspector-loading');
+        const promptDisplay = document.getElementById('inspector-prompt-display');
+        const metaInfo = document.getElementById('inspector-meta-info');
+        const btnUse = document.getElementById('inspector-btn-use');
+        const btnCopy = document.getElementById('inspector-btn-copy');
+        const btnClear = document.getElementById('inspector-btn-clear');
+        const copyOverlay = document.getElementById('inspector-copy-overlay');
+
+        let currentPositivePrompt = "";
+
+        // Event Listeners
+        if (dropZone) {
+            dropZone.addEventListener('click', () => fileInput.click());
+            dropZone.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                dropZone.classList.add('bg-blue-50', 'border-primary');
+            });
+            dropZone.addEventListener('dragleave', () => {
+                dropZone.classList.remove('bg-blue-50', 'border-primary');
+            });
+            dropZone.addEventListener('drop', (e) => {
+                e.preventDefault();
+                dropZone.classList.remove('bg-blue-50', 'border-primary');
+                const file = e.dataTransfer.files[0];
+                if (file) handleFile(file);
+            });
+        }
+        
+        if (fileInput) {
+            fileInput.addEventListener('change', (e) => {
+                if (e.target.files[0]) handleFile(e.target.files[0]);
+            });
+        }
+
+        // Handle File
+        async function handleFile(file) {
+            // Support Image and JSON
+            if (!file.type.startsWith('image/') && !file.name.endsWith('.json') && file.type !== 'application/json') {
+                showError('请上传有效的图片(PNG/JPG/WEBP)或工作流文件(JSON)');
+                return;
+            }
+
+            // Show Preview (only for images)
+            if (file.type.startsWith('image/')) {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    if (preview) {
+                        preview.src = e.target.result;
+                        preview.classList.remove('hidden');
+                    }
+                    if (placeholder) placeholder.classList.add('hidden');
+                };
+                reader.readAsDataURL(file);
+            } else {
+                // JSON file
+                if (preview) {
+                    preview.src = ''; // Clear image
+                    preview.classList.add('hidden');
+                }
+                if (placeholder) {
+                     placeholder.classList.remove('hidden');
+                     placeholder.innerHTML = '<i class="fas fa-file-code text-2xl text-primary mb-2"></i><p class="text-xs text-gray-700 font-bold">' + file.name + '</p>';
+                }
+            }
+
+            // Reset Display
+            if (promptDisplay) promptDisplay.textContent = "正在解析...";
+            if (metaInfo) metaInfo.textContent = "";
+            if (loading) loading.classList.remove('hidden');
+            currentPositivePrompt = "";
+
+            try {
+                const startTime = performance.now();
+                let result = null;
+
+                if (file.name.endsWith('.json') || file.type === 'application/json') {
+                    const text = await file.text();
+                    try {
+                        const json = JSON.parse(text);
+                        result = ComfyUIWorkflowParser.parse(json);
+                    } catch (e) {
+                        throw new Error("无效的JSON文件: " + e.message);
+                    }
+                } else {
+                    result = await parseImageMetadata(file);
+                }
+                
+                const duration = Math.round(performance.now() - startTime);
+                
+                if (result) {
+                    currentPositivePrompt = result;
+                    if (promptDisplay) promptDisplay.textContent = result;
+                    if (metaInfo) metaInfo.textContent = `解析耗时: ${duration}ms`;
+                } else {
+                    if (promptDisplay) promptDisplay.textContent = "未找到正面提示词信息";
+                    if (metaInfo) metaInfo.textContent = `解析耗时: ${duration}ms`;
+                }
+            } catch (error) {
+                console.error(error);
+                if (promptDisplay) promptDisplay.textContent = "解析出错: " + error.message;
+            } finally {
+                if (loading) loading.classList.add('hidden');
+            }
+        }
+
+        // ComfyUI Parser Class
+        const ComfyUIWorkflowParser = {
+            // New helper to detect negative content
+            isLooksLikeNegative(text) {
+                if (!text || typeof text !== 'string') return false;
+                const lower = text.toLowerCase();
+                // Keywords often found in negative prompts
+                const negativeKeywords = [
+                    'worst quality', 'low quality', 'bad anatomy', 'bad hands', 'missing fingers', 
+                    'extra digits', 'bad feet', 'lowres', 'error', 'cropped', 'jpeg artifacts', 
+                    'signature', 'watermark', 'username', 'blurry', 'nsfw', 'fused fingers',
+                    'too many fingers', 'long neck', 'mutated', 'mutation', 'deformed',
+                    'malformed', 'missing limbs', 'extra limbs', 'poorly drawn', 'out of frame'
+                ];
+                
+                let matchCount = 0;
+                for (const kw of negativeKeywords) {
+                    if (lower.includes(kw)) matchCount++;
+                }
+                
+                // If contains multiple negative keywords (threshold 2), treat as negative
+                return matchCount >= 2;
+            },
+
+            parse(json) {
+                // Detect format
+                if (this.isApiFormat(json)) {
+                    return this.parseApiFormat(json);
+                } else if (this.isUiFormat(json)) {
+                    return this.parseUiFormat(json);
+                } else {
+                    // Try to find if it's wrapped (e.g. from prompt endpoint)
+                    if (json.prompt && this.isApiFormat(json.prompt)) {
+                        return this.parseApiFormat(json.prompt);
+                    }
+                     if (json.workflow && this.isUiFormat(json.workflow)) {
+                        return this.parseUiFormat(json.workflow);
+                    }
+                    throw new Error("未识别的ComfyUI工作流格式");
+                }
+            },
+
+            isApiFormat(json) {
+                // API format is a map of ID -> Node, where Node has class_type and inputs
+                if (typeof json !== 'object' || Array.isArray(json)) return false;
+                const keys = Object.keys(json);
+                if (keys.length === 0) return false;
+                // Check a few keys
+                return keys.slice(0, 3).every(k => json[k] && json[k].class_type && json[k].inputs);
+            },
+
+            isUiFormat(json) {
+                // UI format has "nodes" and "links" arrays
+                return json && Array.isArray(json.nodes) && Array.isArray(json.links);
+            },
+
+            // --- API Format Logic ---
+            parseApiFormat(nodesMap) {
+                // Strategy: Find KSampler -> inputs.positive -> [id, slot] -> Text Node
+                let positivePrompts = new Set();
+                
+                // 1. Find KSampler nodes
+                const samplerIds = Object.keys(nodesMap).filter(id => {
+                    const type = nodesMap[id].class_type;
+                    return type && (type.includes('KSampler') || type === 'SamplerCustom');
+                });
+
+                if (samplerIds.length === 0) {
+                     // Fallback: Scan for CLIPTextEncode nodes
+                     return this.fallbackScanApi(nodesMap);
+                }
+
+                for (const samplerId of samplerIds) {
+                    const sampler = nodesMap[samplerId];
+                    if (!sampler.inputs || !sampler.inputs.positive) continue;
+
+                    const link = sampler.inputs.positive; // ["id", slot]
+                    if (!Array.isArray(link)) continue;
+
+                    const [sourceId, slot] = link;
+                    const text = this.traceApiUpstream(nodesMap, sourceId);
+                    if (text) positivePrompts.add(text);
+                }
+
+                if (positivePrompts.size === 0) return this.fallbackScanApi(nodesMap);
+                return Array.from(positivePrompts).join('\n\n');
+            },
+
+            traceApiUpstream(nodesMap, nodeId, visited = new Set()) {
+                if (visited.has(nodeId)) return null;
+                visited.add(nodeId);
+
+                const node = nodesMap[nodeId];
+                if (!node) return null;
+
+                // Strategy 1: Check inputs for direct text values
+                if (node.inputs) {
+                    const checkVal = (val) => {
+                         if (typeof val === 'string' && val.length > 0 && !this.isLooksLikeNegative(val)) return val;
+                         return null;
+                    };
+
+                    if (checkVal(node.inputs.value)) return node.inputs.value;
+                    if (checkVal(node.inputs.text)) return node.inputs.text;
+                    if (checkVal(node.inputs.prompt)) return node.inputs.prompt;
+                    
+                    // Specific handling for "WeiLinComfyUIPromptToLoras" and similar custom nodes
+                    // which store prompts in inputs like "positive", "negative"
+                    // Check specifically for WeiLin or similar pattern where positive is a string input
+                    if (checkVal(node.inputs.positive)) return node.inputs.positive;
+                    // Also check for 'input_text' or similar variations
+                    if (checkVal(node.inputs.input_text)) return node.inputs.input_text;
+
+                    // SDXL
+                    if (node.inputs.text_g || node.inputs.text_l) {
+                        let t = [];
+                        if (checkVal(node.inputs.text_g)) t.push(node.inputs.text_g);
+                        if (checkVal(node.inputs.text_l)) t.push(node.inputs.text_l);
+                        if (t.length > 0) return t.join('\n');
+                    }
+                }
+
+                // Strategy 2: If node has widgets_values
+                if (node.widgets_values && Array.isArray(node.widgets_values)) {
+                    let candidates = [];
+                    for (const val of node.widgets_values) {
+                        if (typeof val === 'string' && val.length > 5) candidates.push(val);
+                    }
+                    const valid = candidates.filter(t => !this.isLooksLikeNegative(t));
+                    if (valid.length > 0) return valid.reduce((a, b) => a.length > b.length ? a : b);
+                }
+
+                // Strategy 3: Trace upstream inputs
+                if (node.inputs) {
+                    for (const key in node.inputs) {
+                         const val = node.inputs[key];
+                         if (Array.isArray(val) && val.length === 2 && typeof val[0] === 'string') {
+                             if (/text|prompt|string|positive|input|source|value|conditioning/.test(key.toLowerCase())) {
+                                 const upstreamText = this.traceApiUpstream(nodesMap, val[0], visited);
+                                 if (upstreamText) return upstreamText;
+                             }
+                         }
+                    }
+                }
+
+                return null;
+            },
+
+            fallbackScanApi(nodesMap) {
+                 let texts = [];
+                 for (const id in nodesMap) {
+                     const node = nodesMap[id];
+                     // Check inputs for text
+                     if (node.inputs) {
+                         if (typeof node.inputs.text === 'string' && node.inputs.text.length > 5) {
+                             if (!this.isNegative(node)) texts.push(node.inputs.text);
+                         }
+                         if (typeof node.inputs.prompt === 'string' && node.inputs.prompt.length > 5) {
+                             if (!this.isNegative(node)) texts.push(node.inputs.prompt);
+                         }
+                         if (typeof node.inputs.value === 'string' && node.inputs.value.length > 5) {
+                             // PrimitiveNode often holds text
+                             if (node.class_type === 'PrimitiveNode' && !this.isNegative(node)) texts.push(node.inputs.value);
+                         }
+                     }
+                 }
+                 return texts.join('\n\n');
+            },
+            
+            isNegative(node) {
+                 const meta = node._meta || {};
+                 return (meta.title && /negative/i.test(meta.title)) || (node.title && /negative/i.test(node.title));
+            },
+
+            // --- UI Format Logic ---
+            parseUiFormat(workflow) {
+                // UI format: nodes array, links array
+                // Build link map: link_id -> {source: [node_id, slot], target: [node_id, slot]}
+                const linkMap = {};
+                if (workflow.links) {
+                    for (const link of workflow.links) {
+                        // link format: [id, origin_id, origin_slot, target_id, target_slot, type]
+                        linkMap[link[0]] = {
+                            sourceId: link[1],
+                            sourceSlot: link[2],
+                            targetId: link[3],
+                            targetSlot: link[4],
+                            type: link[5]
+                        };
+                    }
+                }
+                
+                // Build node map
+                const nodesMap = {};
+                for (const node of workflow.nodes) {
+                    nodesMap[node.id] = node;
+                }
+
+                let positivePrompts = new Set();
+                
+                // 1. Find KSampler nodes
+                const samplers = workflow.nodes.filter(n => n.type && (n.type.includes('KSampler') || n.type === 'SamplerCustom'));
+
+                if (samplers.length === 0) {
+                    return this.fallbackScanUi(workflow.nodes);
+                }
+
+                for (const sampler of samplers) {
+                    // Find input named "positive"
+                    if (!sampler.inputs) continue;
+                    const posInput = sampler.inputs.find(i => i.name === 'positive');
+                    if (!posInput || !posInput.link) continue;
+
+                    const linkId = posInput.link;
+                    const link = linkMap[linkId];
+                    if (!link) continue;
+
+                    const text = this.traceUiUpstream(nodesMap, linkMap, link.sourceId);
+                    if (text) positivePrompts.add(text);
+                }
+
+                if (positivePrompts.size === 0) return this.fallbackScanUi(workflow.nodes);
+                return Array.from(positivePrompts).join('\n\n');
+            },
+
+            traceUiUpstream(nodesMap, linkMap, nodeId, visited = new Set()) {
+                if (visited.has(nodeId)) return null;
+                visited.add(nodeId);
+
+                const node = nodesMap[nodeId];
+                if (!node) return null;
+
+                // Strategy 0: Check inputs for direct text values (UI format rarely puts big text in inputs, but possible)
+                if (node.inputs) {
+                     // Check specific inputs that might contain prompt text directly in UI format (less common but possible for custom nodes)
+                     // Note: in UI format, inputs are usually links or configs. But custom nodes like WeiLin might put text here?
+                     // Actually, in UI format (the .json file), the text is usually in 'widgets_values'.
+                     // But let's check inputs just in case for weird custom nodes that serialize differently.
+                }
+
+                // Strategy 1: Check widgets_values for direct text
+                // Relaxed check: Accept ANY node that has a long string widget
+                if (node.widgets_values && Array.isArray(node.widgets_values)) {
+                    let candidates = [];
+                    for (const val of node.widgets_values) {
+                        if (typeof val === 'string' && val.length > 5) candidates.push(val);
+                    }
+                    const valid = candidates.filter(t => !this.isLooksLikeNegative(t));
+                    if (valid.length > 0) return valid.reduce((a, b) => a.length > b.length ? a : b);
+                }
+                
+                // Strategy 2: Trace upstream inputs
+                if (node.inputs) {
+                    for (const input of node.inputs) {
+                         const name = (input.name || "").toLowerCase();
+                         // Reroute nodes usually have ANY input, check link
+                         const isReroute = node.type === 'Reroute' || node.type === 'NodeReroute';
+                         
+                         // Trace if input name implies text flow or it's a reroute
+                         if ((/text|prompt|string|positive|input|source|value|conditioning/.test(name) || isReroute) && input.link) {
+                             const link = linkMap[input.link];
+                             if (link) {
+                                 const upstreamText = this.traceUiUpstream(nodesMap, linkMap, link.sourceId, visited);
+                                 if (upstreamText) return upstreamText;
+                             }
+                         }
+                    }
+                }
+
+                return null;
+            },
+
+            fallbackScanUi(nodes) {
+                let texts = [];
+                for (const node of nodes) {
+                    // Relaxed scan: check ANY node with widgets_values
+                    if (node.widgets_values && Array.isArray(node.widgets_values)) {
+                        let candidates = [];
+                        for (const val of node.widgets_values) {
+                            if (typeof val === 'string' && val.length > 5) candidates.push(val);
+                        }
+                        const valid = candidates.filter(t => !this.isLooksLikeNegative(t));
+                        
+                        if (valid.length > 0) {
+                            const best = valid.reduce((a, b) => a.length > b.length ? a : b);
+                            
+                            // Check exclusion criteria
+                            if (node.title && /negative/i.test(node.title)) continue;
+                            if (node.color === '#ff0000') continue;
+                            
+                            texts.push(best);
+                        }
+                    }
+                }
+                return texts.join('\n\n');
+            }
+        };
+
+        // Parse Logic
+        async function parseImageMetadata(file) {
+            // 1. Try Manual PNG Parse (Best for SD/NovelAI)
+            if (file.type === 'image/png') {
+                try {
+                    const pngResult = await parsePngMetadata(file);
+                    if (pngResult) return pngResult;
+                } catch (e) {
+                    console.warn('PNG parse failed, falling back to ExifReader', e);
+                }
+            }
+
+            // 2. Fallback to ExifReader (JPG, WebP, or failed PNG)
+            try {
+                // Ensure ExifReader is loaded
+                if (typeof ExifReader === 'undefined') {
+                     throw new Error('ExifReader library not loaded');
+                }
+                const tags = await ExifReader.load(file);
+                
+                // A1111 in UserComment (JPG)
+                if (tags['UserComment']) {
+                    let comment = tags['UserComment'].description;
+                    if (comment) {
+                        return extractPositivePrompt(comment);
+                    }
+                }
+                
+                // Exif parameters
+                if (tags['parameters']) {
+                    return extractPositivePrompt(tags['parameters'].description);
+                }
+
+                return null;
+            } catch (e) {
+                console.error('ExifReader error', e);
+                return null;
+            }
+        }
+
+        async function parsePngMetadata(file) {
+            const arrayBuffer = await file.arrayBuffer();
+            const data = new Uint8Array(arrayBuffer);
+            
+            // PNG Signature
+            if (data[0] !== 137 || data[1] !== 80 || data[2] !== 78 || data[3] !== 71) {
+                return null; // Not PNG
+            }
+
+            let offset = 8;
+            const textChunks = {};
+
+            while (offset < data.length) {
+                const length = new DataView(arrayBuffer).getUint32(offset);
+                const type = new TextDecoder().decode(data.slice(offset + 4, offset + 8));
+                
+                if (type === 'tEXt') {
+                    const chunkData = data.slice(offset + 8, offset + 8 + length);
+                    let nullIndex = -1;
+                    for (let i = 0; i < chunkData.length; i++) {
+                        if (chunkData[i] === 0) {
+                            nullIndex = i;
+                            break;
+                        }
+                    }
+                    
+                    if (nullIndex !== -1) {
+                        const keyword = new TextDecoder().decode(chunkData.slice(0, nullIndex));
+                        const text = new TextDecoder().decode(chunkData.slice(nullIndex + 1));
+                        textChunks[keyword] = text;
+                    }
+                }
+                
+                offset += 12 + length; // Length (4) + Type (4) + Data (length) + CRC (4)
+            }
+
+            // A1111
+            if (textChunks['parameters']) {
+                return extractPositivePrompt(textChunks['parameters']);
+            }
+
+            // NovelAI
+            if (textChunks['Comment']) {
+                try {
+                    const json = JSON.parse(textChunks['Comment']);
+                    if (json.prompt) return json.prompt;
+                } catch (e) {}
+            }
+            if (textChunks['Description']) {
+                 try {
+                    const json = JSON.parse(textChunks['Description']);
+                    if (json.prompt) return json.prompt;
+                } catch (e) {
+                    if (textChunks['Description'].includes('masterpiece')) return textChunks['Description'];
+                }
+            }
+
+            // ComfyUI
+            // Priority: prompt (API format) > workflow (UI format) because prompt is what was actually executed
+            if (textChunks['prompt']) {
+                 try {
+                     const json = JSON.parse(textChunks['prompt']);
+                     return ComfyUIWorkflowParser.parse(json);
+                } catch(e) {
+                    console.error("ComfyUI prompt chunk parse error", e);
+                }
+            }
+
+            if (textChunks['workflow']) {
+                try {
+                     const json = JSON.parse(textChunks['workflow']);
+                     return ComfyUIWorkflowParser.parse(json);
+                } catch(e) {
+                     console.error("ComfyUI workflow chunk parse error", e);
+                }
+            }
+
+            return null;
+        }
+
+        function extractPositivePrompt(text) {
+            // Remove "Negative prompt:" and everything after
+            let positive = text;
+            const negativeIndex = text.indexOf('Negative prompt:');
+            if (negativeIndex !== -1) {
+                positive = text.substring(0, negativeIndex);
+            } else {
+                const stepsIndex = text.indexOf('Steps:');
+                if (stepsIndex !== -1) {
+                    positive = text.substring(0, stepsIndex);
+                }
+            }
+            return positive.trim();
+        }
+
+        // Buttons
+        if (btnCopy) {
+            btnCopy.addEventListener('click', () => {
+                if (currentPositivePrompt) {
+                    navigator.clipboard.writeText(currentPositivePrompt);
+                    showNotification('已复制到剪贴板', 'success');
+                }
+            });
+        }
+        
+        if (copyOverlay) {
+            copyOverlay.addEventListener('click', () => btnCopy && btnCopy.click());
+        }
+
+        if (btnUse) {
+            btnUse.addEventListener('click', () => {
+                if (currentPositivePrompt) {
+                    const textarea = document.getElementById('positivePrompt');
+                    if (textarea) {
+                        textarea.value = currentPositivePrompt;
+                        showNotification('已填入编辑区', 'success');
+                    }
+                }
+            });
+        }
+
+        if (btnClear) {
+            btnClear.addEventListener('click', () => {
+                if (preview) {
+                    preview.src = '';
+                    preview.classList.add('hidden');
+                }
+                if (placeholder) placeholder.classList.remove('hidden');
+                if (promptDisplay) promptDisplay.textContent = "等待图片上传...";
+                if (metaInfo) metaInfo.textContent = "";
+                currentPositivePrompt = "";
+                if (fileInput) fileInput.value = '';
+            });
+        }
+
+        function showError(msg) {
+             if (promptDisplay) promptDisplay.textContent = "错误: " + msg;
+        }
+
+        function showNotification(msg, type) {
+            if (typeof window.showNotification === 'function') {
+                window.showNotification(msg, type);
+            } else {
+                alert(msg);
+            }
+        }
+
+    })();
+</script>
 </body>
 </html>
