@@ -25,6 +25,929 @@
                 }
             }
         }
+        // ==========================================
+        // 系统设置与AI生成模块
+        // ==========================================
+
+        const API_PROVIDERS = [
+            { id: 'deepseek', name: 'Deepseek', icon: 'fa-brain', defaultUrl: 'https://api.deepseek.com', defaultModel: 'deepseek-chat' },
+            { id: 'openai', name: 'OpenAI', icon: 'fa-robot', defaultUrl: 'https://api.openai.com/v1', defaultModel: 'gpt-3.5-turbo' },
+            { id: 'gemini', name: 'Gemini', icon: 'fa-star', defaultUrl: 'https://generativelanguage.googleapis.com/v1beta/openai', defaultModel: 'gemini-pro' },
+            { id: 'siliconflow', name: '硅基流动', icon: 'fa-microchip', defaultUrl: 'https://api.siliconflow.cn/v1', defaultModel: 'Qwen/Qwen2.5-7B-Instruct' }
+        ];
+
+        let systemSettings = {
+            baseUrl: '',
+            defaultModel: '',
+            providers: {},
+            customApis: [],
+            features: {
+                promptGeneration: {
+                    temperature: 0.7,
+                    maxTokens: 2000,
+                    systemPrompt: '你是一个专业的Stable Diffusion提示词专家。请根据用户的描述，生成高质量的英文提示词（Prompt）。\n输出格式要求：直接输出提示词，用英文逗号分隔，不要包含任何解释性文字。\n例如：masterpiece, best quality, 1girl, white hair, blue eyes',
+                    systemPrompts: [
+                        {
+                            id: 'default',
+                            name: '默认设定 (Stable Diffusion)',
+                            content: '你是一个专业的Stable Diffusion提示词专家。请根据用户的描述，生成高质量的英文提示词（Prompt）。\n输出格式要求：直接输出提示词，用英文逗号分隔，不要包含任何解释性文字。\n例如：masterpiece, best quality, 1girl, white hair, blue eyes'
+                        }
+                    ],
+                    selectedSystemPromptId: 'default'
+                }
+            },
+            selectedProvider: 'deepseek'
+        };
+        
+        // 简易加密/解密
+        const simpleEncrypt = (text) => {
+            if (!text) return '';
+            try { return btoa(text); } catch (e) { return text; }
+        };
+        const simpleDecrypt = (text) => {
+            if (!text) return '';
+            try { return atob(text); } catch (e) { return text; }
+        };
+
+        // 初始化设置
+        function initSettings() {
+            const saved = localStorage.getItem('mayi_prompt_settings');
+            if (saved) {
+                try {
+                    const parsed = JSON.parse(saved);
+                    systemSettings = { ...systemSettings, ...parsed };
+                    
+                    // 解密API Keys
+                    if (systemSettings.providers) {
+                        Object.keys(systemSettings.providers).forEach(key => {
+                            if (systemSettings.providers[key].apiKey) {
+                                systemSettings.providers[key].apiKey = simpleDecrypt(systemSettings.providers[key].apiKey);
+                            }
+                        });
+                    }
+                    
+                    // 迁移旧配置
+                    if (parsed.generation && !parsed.features) {
+                        systemSettings.features = {
+                            promptGeneration: { ...parsed.generation }
+                        };
+                        delete systemSettings.generation;
+                    } else if (parsed.features) {
+                        systemSettings.features = { ...systemSettings.features, ...parsed.features };
+                    }
+
+                    // 确保 systemPrompts 存在 (迁移逻辑)
+                    const pg = systemSettings.features.promptGeneration;
+                    if (!pg.systemPrompts || pg.systemPrompts.length === 0) {
+                        pg.systemPrompts = [
+                            {
+                                id: 'default',
+                                name: '默认设定 (Stable Diffusion)',
+                                content: pg.systemPrompt || systemSettings.features.promptGeneration.systemPrompt // Fallback to default if empty
+                            }
+                        ];
+                        pg.selectedSystemPromptId = 'default';
+                    }
+                    // 确保 selectedSystemPromptId 有效
+                    if (!pg.selectedSystemPromptId || !pg.systemPrompts.find(p => p.id === pg.selectedSystemPromptId)) {
+                        pg.selectedSystemPromptId = pg.systemPrompts[0].id;
+                    }
+                } catch (e) {
+                    console.error('Failed to load settings', e);
+                }
+            }
+            
+            bindSettingsEvents();
+            renderProviders();
+            updateSettingsUI();
+        }
+        
+        function saveSettingsToStorage() {
+            const toSave = JSON.parse(JSON.stringify(systemSettings));
+            
+            // 加密存储
+            if (toSave.providers) {
+                Object.keys(toSave.providers).forEach(key => {
+                    if (toSave.providers[key].apiKey) {
+                        toSave.providers[key].apiKey = simpleEncrypt(toSave.providers[key].apiKey);
+                    }
+                });
+            }
+            
+            localStorage.setItem('mayi_prompt_settings', JSON.stringify(toSave));
+        }
+
+        function bindSettingsEvents() {
+            document.getElementById('openSettingsBtn').addEventListener('click', () => {
+                updateSettingsUI();
+                document.getElementById('settingsModal').classList.add('show');
+                document.getElementById('settingsModal').style.visibility = 'visible';
+                document.getElementById('settingsModal').style.opacity = '1';
+            });
+            
+            const closeSettings = () => {
+                document.getElementById('settingsModal').classList.remove('show');
+                document.getElementById('settingsModal').style.visibility = 'hidden';
+                document.getElementById('settingsModal').style.opacity = '0';
+            };
+            
+            document.getElementById('closeSettingsBtn').addEventListener('click', closeSettings);
+            document.getElementById('cancelSettingsBtn').addEventListener('click', closeSettings);
+            
+            document.querySelectorAll('.settings-tab-btn').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    document.querySelectorAll('.settings-tab-btn').forEach(b => b.classList.remove('active'));
+                    this.classList.add('active');
+                    
+                    const tabId = this.dataset.tab;
+                    document.querySelectorAll('.settings-tab-content').forEach(c => c.classList.add('hidden'));
+                    document.getElementById(`tab-${tabId}`).classList.remove('hidden');
+                });
+            });
+            
+            document.getElementById('saveSettingsBtn').addEventListener('click', () => {
+                saveSettingsFromUI();
+                closeSettings();
+                showNotification('设置已保存', 'success');
+            });
+            
+            document.getElementById('aiGenerateBtn').addEventListener('click', handleAiGenerate);
+            
+            document.getElementById('settingTemp').addEventListener('input', function() {
+                document.getElementById('settingTempValue').textContent = this.value;
+            });
+            
+            document.getElementById('exportDataBtn').addEventListener('click', exportGlobalData);
+            document.getElementById('importDataBtn').addEventListener('click', () => document.getElementById('importDataInput').click());
+            document.getElementById('importDataInput').addEventListener('change', importGlobalData);
+            
+            document.getElementById('addCustomApiBtn').addEventListener('click', () => {
+                document.getElementById('customApiName').value = '';
+                document.getElementById('customApiKey').value = '';
+                document.getElementById('customApiBaseUrl').value = '';
+                document.getElementById('customApiModel').value = '';
+                document.getElementById('customApiModal').classList.add('show');
+            });
+            
+            document.getElementById('cancelCustomApiBtn').addEventListener('click', () => {
+                document.getElementById('customApiModal').classList.remove('show');
+            });
+            
+            document.getElementById('confirmCustomApiBtn').addEventListener('click', () => {
+                const name = document.getElementById('customApiName').value.trim();
+                const apiKey = document.getElementById('customApiKey').value.trim();
+                const baseUrl = document.getElementById('customApiBaseUrl').value.trim();
+                const model = document.getElementById('customApiModel').value.trim();
+                
+                if (!name) {
+                    showNotification('请输入服务商名称', 'warning');
+                    return;
+                }
+                
+                const id = 'custom_' + Date.now();
+                if (!systemSettings.customApis) systemSettings.customApis = [];
+                
+                systemSettings.customApis.push({
+                    id: id,
+                    name: name,
+                    icon: 'fa-globe',
+                    defaultUrl: baseUrl || 'https://api.openai.com/v1',
+                    defaultModel: model || 'gpt-3.5-turbo'
+                });
+                
+                // 同时保存配置
+                if (!systemSettings.providers) systemSettings.providers = {};
+                systemSettings.providers[id] = {
+                    apiKey: apiKey,
+                    baseUrl: baseUrl,
+                    model: model
+                };
+                
+                saveSettingsToStorage();
+                renderProviders();
+                
+                document.getElementById('customApiModal').classList.remove('show');
+                showNotification('自定义API已添加', 'success');
+            });
+            
+            document.getElementById('closeConfigFormBtn').addEventListener('click', () => {
+                document.getElementById('apiConfigForm').classList.add('hidden');
+            });
+            
+            document.getElementById('saveApiConfigBtn').addEventListener('click', saveCurrentApiConfig);
+            
+            // System Prompt 管理事件
+            document.getElementById('settingSystemPromptSelect').addEventListener('change', handleSystemPromptChange);
+            document.getElementById('addSystemPromptBtn').addEventListener('click', addSystemPrompt);
+            document.getElementById('saveSystemPromptBtn').addEventListener('click', saveSystemPrompt);
+            document.getElementById('deleteSystemPromptBtn').addEventListener('click', deleteSystemPrompt);
+        }
+
+        function renderProviders() {
+            const container = document.getElementById('apiProviderList');
+            const customApis = systemSettings.customApis || [];
+            const allProviders = [...API_PROVIDERS, ...customApis];
+            
+            container.innerHTML = allProviders.map(p => `
+                <div class="bg-white border border-gray-200 rounded-xl p-4 hover:shadow-md transition-shadow cursor-pointer ${systemSettings.selectedProvider === p.id ? 'ring-2 ring-primary' : ''}" onclick="selectProvider('${p.id}')">
+                    <div class="flex items-center justify-between mb-2">
+                        <div class="flex items-center gap-2">
+                            <div class="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center text-primary">
+                                <i class="fas ${p.icon || 'fa-globe'}"></i>
+                            </div>
+                            <span class="font-semibold text-gray-800">${p.name}</span>
+                        </div>
+                        <div class="flex items-center gap-2">
+                             ${p.id.startsWith('custom_') ? `<button class="text-gray-400 hover:text-red-500" onclick="event.stopPropagation(); deleteCustomApi('${p.id}')" title="删除"><i class="fas fa-trash-alt"></i></button>` : ''}
+                             <div class="text-xs ${systemSettings.providers[p.id]?.apiKey ? 'text-green-500 font-medium' : 'text-gray-400'}">
+                                ${systemSettings.providers[p.id]?.apiKey ? '已配置' : '未配置'}
+                            </div>
+                        </div>
+                    </div>
+                    <div class="text-xs text-gray-500 truncate">${systemSettings.providers[p.id]?.baseUrl || p.defaultUrl}</div>
+                    <div class="mt-3 flex justify-end">
+                        <button class="text-xs bg-gray-100 hover:bg-gray-200 text-gray-700 px-2 py-1 rounded transition-colors" onclick="event.stopPropagation(); editApiConfig('${p.id}')">
+                            <i class="fas fa-cog"></i> 配置
+                        </button>
+                    </div>
+                </div>
+            `).join('');
+            
+            const customList = document.getElementById('customApiList');
+            if (customList) {
+                if (customApis.length === 0) {
+                    customList.innerHTML = '<p class="text-gray-500 text-sm italic">暂无自定义API，请点击上方按钮添加。</p>';
+                } else {
+                    customList.innerHTML = customApis.map(p => `
+                        <div class="flex items-center justify-between bg-gray-50 p-3 rounded-lg border border-gray-200">
+                            <div class="flex items-center gap-2">
+                                <i class="fas fa-globe text-gray-400"></i>
+                                <span class="text-sm font-medium text-gray-700">${p.name}</span>
+                            </div>
+                            <div class="flex gap-2">
+                                <button class="text-blue-500 hover:text-blue-700 text-xs" onclick="document.querySelector('[data-tab=\\'official\\']').click(); selectProvider('${p.id}'); editApiConfig('${p.id}');">配置</button>
+                                <button class="text-red-500 hover:text-red-700 text-xs" onclick="deleteCustomApi('${p.id}')">删除</button>
+                            </div>
+                        </div>
+                    `).join('');
+                }
+            }
+        }
+
+        window.selectProvider = function(id) {
+            systemSettings.selectedProvider = id;
+            renderProviders();
+        };
+        
+        window.deleteCustomApi = function(id) {
+            if (!confirm('确定要删除这个自定义API吗？')) return;
+            systemSettings.customApis = systemSettings.customApis.filter(p => p.id !== id);
+            if (systemSettings.selectedProvider === id) {
+                systemSettings.selectedProvider = 'deepseek';
+            }
+            saveSettingsToStorage();
+            renderProviders();
+        };
+
+        window.editApiConfig = function(id) {
+            const customApis = systemSettings.customApis || [];
+            const allProviders = [...API_PROVIDERS, ...customApis];
+            const provider = allProviders.find(p => p.id === id);
+            const config = systemSettings.providers[id] || {};
+            
+            document.getElementById('configProviderId').value = id;
+            document.getElementById('currentConfigTitle').textContent = `配置 ${provider.name}`;
+            document.getElementById('configApiKey').value = config.apiKey || '';
+            document.getElementById('configModel').value = config.model || provider.defaultModel;
+            document.getElementById('configBaseUrl').value = config.baseUrl || '';
+            
+            document.getElementById('apiConfigForm').classList.remove('hidden');
+            document.getElementById('apiConfigForm').scrollIntoView({ behavior: 'smooth' });
+        };
+
+        function saveCurrentApiConfig() {
+            const id = document.getElementById('configProviderId').value;
+            const apiKey = document.getElementById('configApiKey').value.trim();
+            const model = document.getElementById('configModel').value.trim();
+            const baseUrl = document.getElementById('configBaseUrl').value.trim();
+            
+            if (!apiKey) {
+                showNotification('请输入API Key', 'warning');
+                return;
+            }
+            
+            systemSettings.providers[id] = { apiKey, model, baseUrl };
+            renderProviders();
+            document.getElementById('apiConfigForm').classList.add('hidden');
+            saveSettingsToStorage();
+            showNotification('API配置已更新', 'success');
+        }
+
+        function renderSystemPromptSelect() {
+            const pg = systemSettings.features.promptGeneration;
+            const select = document.getElementById('settingSystemPromptSelect');
+            
+            // 确保有 systemPrompts
+            if (!pg.systemPrompts) pg.systemPrompts = [];
+            
+            select.innerHTML = pg.systemPrompts.map(p => `
+                <option value="${p.id}" ${p.id === pg.selectedSystemPromptId ? 'selected' : ''}>${p.name}</option>
+            `).join('');
+            
+            // 更新当前显示的 Prompt 内容
+            const current = pg.systemPrompts.find(p => p.id === pg.selectedSystemPromptId);
+            if (current) {
+                document.getElementById('settingSystemPrompt').value = current.content;
+            }
+        }
+
+        function handleSystemPromptChange() {
+            const select = document.getElementById('settingSystemPromptSelect');
+            const pg = systemSettings.features.promptGeneration;
+            pg.selectedSystemPromptId = select.value;
+            
+            // 仅仅更新 Textarea 内容，不需要重绘 Select
+            const current = pg.systemPrompts.find(p => p.id === pg.selectedSystemPromptId);
+            if (current) {
+                document.getElementById('settingSystemPrompt').value = current.content;
+            }
+        }
+
+        function addSystemPrompt() {
+            const name = prompt("请输入新设定的名称：", "新设定");
+            if (!name) return;
+            
+            const pg = systemSettings.features.promptGeneration;
+            const newId = 'sp_' + Date.now();
+            const newPrompt = {
+                id: newId,
+                name: name,
+                content: ''
+            };
+            
+            pg.systemPrompts.push(newPrompt);
+            pg.selectedSystemPromptId = newId;
+            renderSystemPromptSelect();
+            document.getElementById('settingSystemPrompt').focus();
+        }
+
+        function saveSystemPrompt() {
+            const pg = systemSettings.features.promptGeneration;
+            const content = document.getElementById('settingSystemPrompt').value;
+            const current = pg.systemPrompts.find(p => p.id === pg.selectedSystemPromptId);
+            
+            if (current) {
+                current.content = content;
+                pg.systemPrompt = content; // 同步当前生效的prompt
+                showNotification(`已更新预设 "${current.name}"`, 'success');
+            }
+        }
+
+        function deleteSystemPrompt() {
+            const pg = systemSettings.features.promptGeneration;
+            if (pg.systemPrompts.length <= 1) {
+                showNotification("至少保留一个预设", 'warning');
+                return;
+            }
+            
+            if (!confirm("确定要删除当前预设吗？")) return;
+            
+            const index = pg.systemPrompts.findIndex(p => p.id === pg.selectedSystemPromptId);
+            if (index !== -1) {
+                pg.systemPrompts.splice(index, 1);
+                pg.selectedSystemPromptId = pg.systemPrompts[Math.max(0, index - 1)].id;
+                renderSystemPromptSelect();
+                showNotification("预设已删除", 'success');
+            }
+        }
+
+        function updateSettingsUI() {
+            document.getElementById('settingBaseUrl').value = systemSettings.baseUrl || '';
+            document.getElementById('settingDefaultModel').value = systemSettings.defaultModel || '';
+            
+            // 更新全局服务商选择下拉框
+            const providerSelect = document.getElementById('settingGlobalProvider');
+            const customApis = systemSettings.customApis || [];
+            const allProviders = [...API_PROVIDERS, ...customApis];
+            
+            providerSelect.innerHTML = allProviders.map(p => `
+                <option value="${p.id}" ${systemSettings.selectedProvider === p.id ? 'selected' : ''}>
+                    ${p.name} (${p.id.startsWith('custom_') ? '自定义' : '官方'})
+                </option>
+            `).join('');
+            
+            // 提示词生成配置
+            const promptGen = systemSettings.features.promptGeneration;
+            document.getElementById('settingTemp').value = promptGen.temperature;
+            document.getElementById('settingTempValue').textContent = promptGen.temperature;
+            document.getElementById('settingMaxTokens').value = promptGen.maxTokens;
+            
+            renderSystemPromptSelect();
+            
+            renderProviders();
+        }
+
+        function saveSettingsFromUI() {
+            systemSettings.baseUrl = document.getElementById('settingBaseUrl').value.trim();
+            systemSettings.defaultModel = document.getElementById('settingDefaultModel').value.trim();
+            systemSettings.selectedProvider = document.getElementById('settingGlobalProvider').value;
+            
+            const pg = systemSettings.features.promptGeneration;
+            pg.temperature = parseFloat(document.getElementById('settingTemp').value);
+            pg.maxTokens = parseInt(document.getElementById('settingMaxTokens').value);
+            
+            // 保存当前 Textarea 内容到选中的预设
+            const content = document.getElementById('settingSystemPrompt').value;
+            const current = pg.systemPrompts.find(p => p.id === pg.selectedSystemPromptId);
+            if (current) {
+                current.content = content;
+            }
+            pg.systemPrompt = content; // 兼容字段
+            
+            saveSettingsToStorage();
+            showNotification('设置已保存', 'success');
+            document.getElementById('settingsModal').classList.remove('show');
+            document.getElementById('settingsModal').style.visibility = 'hidden';
+            document.getElementById('settingsModal').style.opacity = '0';
+        }
+
+        async function callLLM(messages, options = {}) {
+            const providerId = systemSettings.selectedProvider;
+            const config = systemSettings.providers[providerId];
+            
+            if (!config || !config.apiKey) {
+                throw new Error('请先在设置中配置API Key');
+            }
+
+            const customApis = systemSettings.customApis || [];
+            const allProviders = [...API_PROVIDERS, ...customApis];
+            const provider = allProviders.find(p => p.id === providerId);
+            
+            const baseUrl = config.baseUrl || systemSettings.baseUrl || provider.defaultUrl;
+            const model = options.model || config.model || systemSettings.defaultModel || provider.defaultModel;
+            const url = `${baseUrl.replace(/\/+$/, '')}/chat/completions`;
+
+            const requestBody = {
+                model: model,
+                messages: messages,
+                temperature: options.temperature || 0.7,
+                max_tokens: options.max_tokens || 2000
+            };
+            
+            if (options.jsonMode) {
+                requestBody.response_format = { type: "json_object" };
+            }
+
+            const response = await fetch(url, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${config.apiKey}`
+                },
+                body: JSON.stringify(requestBody)
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => ({}));
+                const errorMessage = errorData.error?.message || `HTTP Error ${response.status}`;
+                throw new Error(errorMessage);
+            }
+
+            const data = await response.json();
+            if (!data.choices || !data.choices[0] || !data.choices[0].message) {
+                throw new Error('API返回格式异常');
+            }
+            return data.choices[0].message.content;
+        }
+
+        async function translateTags(tags) {
+            if (!tags || tags.length === 0) return {};
+            
+            const prompt = `Translate the following Stable Diffusion tags/prompts from English to Chinese. Keep the meaning accurate for AI art generation context. Return a strictly valid JSON object where keys are the original English tags and values are the Chinese translations.
+Tags to translate:
+${JSON.stringify(tags)}`;
+
+            try {
+                const content = await callLLM([
+                    { role: 'system', content: 'You are a helpful translator for Stable Diffusion prompts. Output JSON only.' },
+                    { role: 'user', content: prompt }
+                ], { jsonMode: true });
+                
+                // Try to parse JSON
+                let jsonStr = content;
+                // Remove markdown code blocks if present
+                if (jsonStr.includes('```json')) {
+                    jsonStr = jsonStr.split('```json')[1].split('```')[0];
+                } else if (jsonStr.includes('```')) {
+                    jsonStr = jsonStr.split('```')[1].split('```')[0];
+                }
+                
+                return JSON.parse(jsonStr.trim());
+            } catch (error) {
+                console.error('Translation failed:', error);
+                return {};
+            }
+        }
+
+        async function handleAiGenerate() {
+            const btn = document.getElementById('aiGenerateBtn');
+            const originalHtml = btn.innerHTML;
+            
+            const currentPrompt = document.getElementById('positivePrompt').value.trim();
+            // 如果为空，则生成随机主题
+            const promptText = currentPrompt || "random high quality masterpiece";
+            
+            doGenerate(promptText, btn, originalHtml);
+        }
+
+        async function doGenerate(promptText, btn, originalHtml) {
+            const providerId = systemSettings.selectedProvider;
+            const config = systemSettings.providers[providerId];
+            
+            if (!config || !config.apiKey) {
+                showNotification('请先在设置中配置API Key', 'error');
+                document.getElementById('openSettingsBtn').click();
+                return;
+            }
+
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 生成中...';
+            showNotification('开始请求AI生成...', 'info');
+            
+            // 点击生成后清空输入框
+            document.getElementById('positivePrompt').value = '';
+            
+            try {
+                const customApis = systemSettings.customApis || [];
+                const allProviders = [...API_PROVIDERS, ...customApis];
+                const provider = allProviders.find(p => p.id === providerId);
+                
+                const baseUrl = config.baseUrl || systemSettings.baseUrl || provider.defaultUrl;
+                const model = config.model || systemSettings.defaultModel || provider.defaultModel;
+                const url = `${baseUrl.replace(/\/+$/, '')}/chat/completions`;
+                
+                // 获取提示词生成配置
+                const promptGen = systemSettings.features.promptGeneration;
+
+                const response = await fetch(url, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${config.apiKey}`
+                    },
+                    body: JSON.stringify({
+                        model: model,
+                        messages: [
+                            { role: 'system', content: promptGen.systemPrompt },
+                            { role: 'user', content: `Create a Stable Diffusion prompt for: ${promptText}` }
+                        ],
+                        temperature: promptGen.temperature,
+                        max_tokens: promptGen.maxTokens
+                    })
+                });
+
+                if (!response.ok) {
+                    const errorData = await response.json().catch(() => ({}));
+                    const errorMessage = errorData.error?.message || `HTTP Error ${response.status}`;
+                    throw new Error(errorMessage);
+                }
+
+                const data = await response.json();
+                if (!data.choices || !data.choices[0] || !data.choices[0].message) {
+                    throw new Error('API返回格式异常');
+                }
+                const content = data.choices[0].message.content;
+                
+                document.getElementById('positivePrompt').value = content;
+                document.getElementById('pasteAnalyzeBtn').click();
+                showNotification('AI生成成功！', 'success');
+                
+            } catch (error) {
+                console.error('AI Generation Error:', error);
+                // 详细错误提示
+                alert(`生成失败：\n${error.message}\n\n请检查API Key、网络连接或API余额。`);
+                showNotification(`生成失败: ${error.message}`, 'error');
+                // 恢复之前的内容（如果失败了）
+                if (promptText !== "random high quality masterpiece") {
+                    document.getElementById('positivePrompt').value = promptText;
+                }
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = originalHtml;
+            }
+        }
+
+        let pendingImportData = null;
+        let selectionMode = 'export';
+
+        function openDataSelectionModal(mode, availableData = null) {
+            selectionMode = mode;
+            const modal = document.getElementById('dataSelectionModal');
+            const title = document.getElementById('dataSelectionTitle');
+            const desc = document.getElementById('dataSelectionDesc');
+            
+            modal.classList.add('show');
+            modal.style.visibility = 'visible';
+            modal.style.opacity = '1';
+            
+            if (mode === 'export') {
+                title.textContent = '导出数据选择';
+                desc.textContent = '请选择要导出的数据内容：';
+                document.getElementById('selSystemConfig').checked = true;
+                document.getElementById('selSystemConfig').disabled = false;
+                document.getElementById('selTagData').checked = true;
+                document.getElementById('selTagData').disabled = false;
+                document.getElementById('selPromptData').checked = true;
+                document.getElementById('selPromptData').disabled = false;
+            } else {
+                title.textContent = '导入数据选择';
+                desc.textContent = '请选择要导入的数据内容（将覆盖现有数据）：';
+                
+                const hasConfig = availableData && (availableData.settings || availableData.systemSettings);
+                const hasTags = availableData && (availableData.tags || availableData.mainCategories);
+                const hasPrompts = availableData && (availableData.presets || availableData.presetCategories);
+                
+                const configCb = document.getElementById('selSystemConfig');
+                configCb.checked = hasConfig;
+                configCb.disabled = !hasConfig;
+                
+                const tagCb = document.getElementById('selTagData');
+                tagCb.checked = hasTags;
+                tagCb.disabled = !hasTags;
+                
+                const promptCb = document.getElementById('selPromptData');
+                promptCb.checked = hasPrompts;
+                promptCb.disabled = !hasPrompts;
+            }
+        }
+        
+        function closeDataSelectionModal() {
+            const modal = document.getElementById('dataSelectionModal');
+            modal.classList.remove('show');
+            modal.style.visibility = 'hidden';
+            modal.style.opacity = '0';
+            pendingImportData = null;
+        }
+
+        function exportGlobalData() {
+            openDataSelectionModal('export');
+        }
+
+        function executeExport() {
+            const exportConfig = document.getElementById('selSystemConfig').checked;
+            const exportTags = document.getElementById('selTagData').checked;
+            const exportPrompts = document.getElementById('selPromptData').checked;
+            
+            if (!exportConfig && !exportTags && !exportPrompts) {
+                showNotification('请至少选择一项导出内容', 'warning');
+                return;
+            }
+
+            const data = {
+                version: '3.4.11',
+                timestamp: new Date().toISOString(),
+                author: 'Mayi',
+                github: 'https://clay2001.github.io/Prompt-UI/'
+            };
+
+            if (exportConfig) {
+                data.systemSettings = systemSettings;
+                if (typeof settings !== 'undefined') {
+                    data.uiSettings = {
+                        showPlusMinus: settings.showPlusMinus,
+                        weightSymbol: settings.weightSymbol,
+                        showDelete: settings.showDelete,
+                        showR18Groups: settings.showR18Groups,
+                        showNegative: settings.showNegative,
+                        favorites: settings.favorites
+                    };
+                }
+            }
+
+            if (exportTags && typeof settings !== 'undefined') {
+                data.mainCategories = settings.mainCategories;
+                data.tags = settings.tags;
+                data.groups = settings.groups;
+            }
+
+            if (exportPrompts && typeof settings !== 'undefined') {
+                data.presetCategories = settings.presetCategories;
+                data.presets = settings.presets;
+            }
+            
+            const shouldEncrypt = document.getElementById('encryptDataCheckbox').checked;
+            let exportContent = JSON.stringify(data, null, 2);
+            
+            if (shouldEncrypt) {
+                try {
+                    exportContent = btoa(unescape(encodeURIComponent(exportContent)));
+                } catch (e) {
+                    console.error('Encryption failed', e);
+                    showNotification('加密失败，将导出未加密数据', 'warning');
+                }
+            }
+            
+            const blob = new Blob([exportContent], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            const types = [];
+            if (exportConfig) types.push('config');
+            if (exportTags) types.push('tags');
+            if (exportPrompts) types.push('prompts');
+            
+            const typeStr = types.length === 3 ? 'full' : types.join('_');
+            
+            a.download = `mayi_prompt_backup_${typeStr}_${shouldEncrypt ? 'encrypted_' : ''}${new Date().toISOString().split('T')[0]}.json`;
+            a.click();
+            URL.revokeObjectURL(url);
+            showNotification('数据导出成功', 'success');
+            closeDataSelectionModal();
+        }
+
+        function importGlobalData(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    let content = e.target.result;
+                    let data;
+                    
+                    if (!content.trim().startsWith('{')) {
+                        try {
+                            const decoded = decodeURIComponent(escape(atob(content)));
+                            data = JSON.parse(decoded);
+                        } catch (err) {
+                             try {
+                                data = JSON.parse(content);
+                            } catch (parseErr) {
+                                throw new Error('无法解析文件，可能是格式错误或解密失败');
+                            }
+                        }
+                    } else {
+                        data = JSON.parse(content);
+                    }
+                    
+                    const normalizedData = {};
+                    
+                    if (data.systemSettings) {
+                        normalizedData.systemSettings = data.systemSettings;
+                    } else if (data.settings && data.settings.providers) {
+                        normalizedData.systemSettings = data.settings;
+                    }
+                    
+                    if (data.mainCategories) normalizedData.mainCategories = data.mainCategories;
+                    if (data.tags) normalizedData.tags = data.tags;
+                    if (data.groups) normalizedData.groups = data.groups;
+                    if (data.presetCategories) normalizedData.presetCategories = data.presetCategories;
+                    if (data.presets) normalizedData.presets = data.presets;
+                    
+                    if (data.uiSettings) {
+                        normalizedData.uiSettings = data.uiSettings;
+                    } else if (data.settings && !data.settings.providers) {
+                        normalizedData.uiSettings = data.settings;
+                    }
+
+                    pendingImportData = normalizedData;
+                    openDataSelectionModal('import', normalizedData);
+                    
+                } catch (error) {
+                    showNotification(error.message || '文件导入失败', 'error');
+                    console.error(error);
+                }
+                event.target.value = '';
+            };
+            reader.readAsText(file);
+        }
+
+        function executeImport() {
+            if (!pendingImportData) return;
+            
+            const importConfig = document.getElementById('selSystemConfig').checked;
+            const importTags = document.getElementById('selTagData').checked;
+            const importPrompts = document.getElementById('selPromptData').checked;
+            
+            let msg = [];
+            if (importConfig) msg.push('系统配置');
+            if (importTags) msg.push('标签数据');
+            if (importPrompts) msg.push('Prompt数据');
+            
+            if (msg.length === 0) {
+                showNotification('请至少选择一项导入内容', 'warning');
+                return;
+            }
+            
+            if (!confirm(`确定要导入 ${msg.join('、')} 吗？这将覆盖现有相关数据。`)) {
+                return;
+            }
+
+            try {
+                if (importConfig && pendingImportData.systemSettings) {
+                    systemSettings = { ...systemSettings, ...pendingImportData.systemSettings };
+                    saveSettingsToStorage();
+                }
+
+                if (importTags && pendingImportData.tags) {
+                    settings.mainCategories = pendingImportData.mainCategories || settings.mainCategories;
+                    settings.tags = pendingImportData.tags || settings.tags;
+                    settings.groups = pendingImportData.groups || settings.groups;
+                    
+                     if (settings.mainCategories) {
+                        settings.mainCategories.forEach(c => c.isSystem = false);
+                     }
+                }
+
+                if (importPrompts && pendingImportData.presets) {
+                    settings.presetCategories = pendingImportData.presetCategories || settings.presetCategories;
+                    settings.presets = pendingImportData.presets || settings.presets;
+                    
+                    if (settings.presetCategories) {
+                        settings.presetCategories.forEach(c => c.isSystem = false);
+                    }
+                    
+                    Object.keys(settings.presets).forEach(category => {
+                        settings.presets[category].forEach(preset => {
+                            if (preset.rating === undefined) preset.rating = 5;
+                            if (preset.favorite === undefined) preset.favorite = false;
+                        });
+                    });
+                }
+                
+                if ((importTags || importPrompts) && pendingImportData.uiSettings) {
+                     const ui = pendingImportData.uiSettings;
+                     settings.showPlusMinus = ui.showPlusMinus !== undefined ? ui.showPlusMinus : settings.showPlusMinus;
+                     settings.weightSymbol = ui.weightSymbol || settings.weightSymbol;
+                     settings.showDelete = ui.showDelete !== undefined ? ui.showDelete : settings.showDelete;
+                     settings.showR18Groups = ui.showR18Groups !== undefined ? ui.showR18Groups : settings.showR18Groups;
+                     settings.showNegative = ui.showNegative !== undefined ? ui.showNegative : settings.showNegative;
+                     settings.favorites = ui.favorites || settings.favorites;
+                }
+
+                if (importTags || importPrompts) {
+                    saveData();
+                    if (typeof renderTagTabButtons === 'function') renderTagTabButtons();
+                    if (typeof renderPresetTabButtons === 'function') renderPresetTabButtons();
+                    if (typeof renderPresets === 'function') renderPresets();
+                    showNotification('导入成功，正在刷新界面...', 'success');
+                    setTimeout(() => location.reload(), 1000);
+                } else {
+                    updateSettingsUI();
+                    showNotification('导入成功', 'success');
+                    closeDataSelectionModal();
+                }
+                
+            } catch (e) {
+                console.error('Import execution failed', e);
+                showNotification('导入过程中发生错误', 'error');
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            // 初始化系统设置
+            if (typeof initSettings === 'function') {
+                initSettings();
+            }
+
+            // 绑定数据选择模态框事件
+            const cancelBtn = document.getElementById('cancelDataSelectionBtn');
+            const confirmBtn = document.getElementById('confirmDataSelectionBtn');
+            
+            if (cancelBtn) {
+                cancelBtn.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    console.log('[DataSelection] Cancel button clicked');
+                    closeDataSelectionModal();
+                });
+            } else {
+                console.warn('[DataSelection] Cancel button not found');
+            }
+            
+            if (confirmBtn) {
+                confirmBtn.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    console.log('[DataSelection] Confirm button clicked, mode:', selectionMode);
+                    try {
+                        if (selectionMode === 'export') {
+                            executeExport();
+                        } else {
+                            executeImport();
+                        }
+                    } catch (err) {
+                        console.error('[DataSelection] Action failed:', err);
+                        if (typeof showNotification === 'function') {
+                            showNotification('操作失败: ' + err.message, 'error');
+                        } else {
+                            alert('操作失败: ' + err.message);
+                        }
+                    }
+                });
+            } else {
+                console.warn('[DataSelection] Confirm button not found');
+            }
+        });
+
     </script>
     <style>
         body {
@@ -1094,14 +2017,132 @@
         .suggestion-primary { font-weight:600; color:#1e293b; }
         .suggestion-secondary { color:#64748b; margin-left:8px; }
         .suggestion-empty { padding:10px; color:#94a3b8; text-align:center; font-size:12px; }
+        /* 布局优化：水平并排显示 */
+        .split-layout-container {
+            display: flex;
+            gap: 24px;
+            margin-bottom: 24px;
+            align-items: stretch;
+        }
+
+        .split-layout-container .app-card {
+            flex: 1;
+            margin-bottom: 0;
+            display: flex;
+            flex-direction: column;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            width: 100%;
+        }
+
+        /* 响应式：小屏幕垂直堆叠 */
+        @media (max-width: 768px) {
+            .split-layout-container {
+                flex-direction: column;
+            }
+        }
+
+        /* 图片预览容器样式 */
+        .preset-image-wrapper {
+            height: 200px;
+            background: #f8fafc;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            overflow: hidden;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+            margin-bottom: 12px;
+        }
+
+        .preset-image {
+            max-width: 100%;
+            max-height: 100%;
+            object-fit: contain;
+            transition: transform 0.3s ease;
+        }
+
+        .magnifier-btn {
+            position: absolute;
+            bottom: 8px;
+            right: 8px;
+            width: 20px;
+            height: 20px;
+            background: rgba(255, 255, 255, 0.9);
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            transition: all 0.2s;
+            z-index: 10;
+            opacity: 0.8;
+        }
+
+        .magnifier-btn:hover {
+            opacity: 1;
+            transform: scale(1.1);
+            background: white;
+        }
+
+        .magnifier-btn i {
+            font-size: 10px;
+            color: #4b5563;
+        }
+
+        /* 放大预览框 - Lightbox Style */
+        .image-lightbox {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.85);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 10000;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.3s ease;
+            backdrop-filter: blur(5px);
+            pointer-events: none; /* 允许鼠标事件穿透，避免闪烁 */
+        }
+
+        .image-lightbox.active {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        .image-lightbox img {
+            max-width: 90%;
+            max-height: 90%;
+            object-fit: contain;
+            transform: scale(0.9);
+            transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+            box-shadow: 0 5px 30px rgba(0,0,0,0.5);
+            border-radius: 8px;
+        }
+
+        .image-lightbox.active img {
+            transform: scale(1);
+        }
+
     </style>
 </head>
 <body class="min-h-screen py-6 px-4">
     <div class="max-w-7xl mx-auto">
         <!-- 主标题 -->
-        <h1 class="main-title">Mayi Prompt UI</h1>
-        <p class="subtitle">提示词管理工具 - 支持数据导出导入和本地存储</p>
+        <div class="relative mb-6">
+            <h1 class="main-title">Mayi Prompt UI</h1>
+            <p class="subtitle mb-0">提示词管理工具 - 支持数据导出导入和本地存储</p>
+            <button id="openSettingsBtn" class="absolute top-0 right-0 btn btn-secondary p-2 rounded-full w-10 h-10 flex items-center justify-center shadow-lg hover:rotate-90 transition-transform duration-500" title="系统设置">
+                <i class="fas fa-cog text-xl"></i>
+            </button>
+        </div>
         
+        <div class="split-layout-container">
         <!-- 已选择标签区域 -->
         <div class="app-card">
             <div class="title-bar">
@@ -1110,14 +2151,17 @@
                 </h3>
                 <div class="title-actions">
                     <div class="flex flex-wrap gap-2">
-                        <button id="togglePlusMinus" class="btn btn-primary">
-                            <i class="fas fa-plus-minus"></i> 加减号
+                        <button id="togglePlusMinus" class="btn btn-primary" title="加减号">
+                            <i class="fas fa-plus-minus"></i>
                         </button>
-                        <button id="toggleDelete" class="btn btn-warning">
-                            <i class="fas fa-trash"></i> 删除X
+                        <button id="toggleDelete" class="btn btn-warning" title="删除">
+                            <i class="fas fa-trash"></i>
                         </button>
-                        <button id="clearAllBtn" class="btn btn-danger">
-                            <i class="fas fa-broom"></i> 清空
+                        <button id="translateSelectedBtn" class="btn btn-info" title="翻译标签">
+                            <i class="fas fa-language"></i>
+                        </button>
+                        <button id="clearAllBtn" class="btn btn-danger" title="清空">
+                            <i class="fas fa-broom"></i>
                         </button>
                     </div>
                 </div>
@@ -1137,18 +2181,19 @@
                 <textarea id="positivePrompt" class="flex-1 w-full px-3 py-2 bg-gradient-to-br from-white to-gray-50 border-2 border-purple-200 resize-none min-h-[100px] rounded-md focus:outline-none focus:ring-2 focus:ring-purple-300 focus:border-purple-300" placeholder="在此粘贴提示词，系统会自动解析..."></textarea>
                 <div class="flex flex-col gap-2">
                     <button id="pasteAnalyzeBtn" class="btn btn-info">
-                        <i class="fas fa-magic"></i> 解析粘贴
+                        <i class="fas fa-magic"></i> 解析
                     </button>
                     <button id="copyPrompt" class="btn btn-primary">
                         <i class="fas fa-copy"></i> 复制
                     </button>
-                    <button id="downloadPrompt" class="btn btn-success">
-                        <i class="fas fa-download"></i> 下载
+                    <button id="aiGenerateBtn" class="btn btn-success" title="使用AI生成提示词">
+                        <i class="fas fa-robot"></i> AI生成
                     </button>
                 </div>
             </div>
             <!-- 解析结果显示区域 -->
             <div id="parsedTagsContainer" style="display: none;"></div>
+        </div>
         </div>
         
         <!-- 标签管理区域 -->
@@ -1228,9 +2273,7 @@
                     <button id="managePresetCategoriesBtn" class="btn btn-info">
                         <i class="fas fa-th-large"></i> 分类管理
                     </button>
-                    <button id="showDataManagementBtn" class="btn btn-secondary">
-                        <i class="fas fa-database"></i> 数据管理
-                    </button>
+
                 </div>
             </div>
             
@@ -1575,73 +2618,40 @@
         </div>
     </div>
     
-    <!-- 数据管理模态框 -->
-    <div id="dataManagementModal" class="modal-overlay">
-        <div class="modal">
-            <div class="modal-title">
-                <i class="fas fa-database mr-2"></i> 数据管理
-            </div>
-            <div class="modal-content">
-                <div class="data-option" id="exportAllData">
-                    <div class="data-option-title">
-                        <i class="fas fa-download mr-2"></i> 导出所有数据
-                    </div>
-                    <div class="data-option-description">
-                        将所有标签、分组、分类和Prompt数据导出为JSON文件
-                    </div>
+    <!-- 自定义API配置模态框 -->
+    <div id="customApiModal" class="modal-overlay" style="z-index: 1001;">
+        <div class="bg-white w-full max-w-md rounded-2xl shadow-2xl p-6">
+            <h3 class="text-xl font-bold text-gray-800 mb-4 flex items-center gap-2">
+                <i class="fas fa-globe text-primary"></i> 添加自定义API
+            </h3>
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">服务商名称</label>
+                    <input type="text" id="customApiName" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary" placeholder="例如: Local Ollama">
                 </div>
-                <div class="data-option" id="importAllData">
-                    <div class="data-option-title">
-                        <i class="fas fa-upload mr-2"></i> 导入所有数据
-                    </div>
-                    <div class="data-option-description">
-                        从JSON文件导入所有数据，将覆盖现有数据
-                    </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">API Key</label>
+                    <input type="password" id="customApiKey" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary" placeholder="sk-...">
                 </div>
-                <div id="importOptions" class="import-options">
-                    <p>请选择要导入的JSON文件：</p>
-                    <input type="file" id="importFile" accept=".json">
-                    <button id="cancelImportBtn" class="btn btn-secondary mt-4">取消导入</button>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Base URL</label>
+                    <input type="text" id="customApiBaseUrl" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary" placeholder="https://api.example.com/v1">
                 </div>
-                <div class="data-option" id="resetAllData">
-                    <div class="data-option-title">
-                        <i class="fas fa-trash mr-2"></i> 重置所有数据
-                    </div>
-                    <div class="data-option-description">
-                        清除所有数据并恢复到初始状态
-                    </div>
-                </div>
-                <div class="data-option" id="showLocalStorageInfo">
-                    <div class="data-option-title">
-                        <i class="fas fa-info-circle mr-2"></i> 存储信息
-                    </div>
-                    <div class="data-option-description">
-                        查看本地存储使用情况和数据统计
-                    </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Model Name</label>
+                    <input type="text" id="customApiModel" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary" placeholder="gpt-3.5-turbo">
                 </div>
             </div>
-            <div class="modal-footer">
-                <button id="closeDataManagementBtn" class="btn btn-secondary">关闭</button>
+            <div class="mt-6 flex justify-end gap-3">
+                <button id="cancelCustomApiBtn" class="btn btn-secondary">取消</button>
+                <button id="confirmCustomApiBtn" class="btn btn-primary">添加</button>
             </div>
         </div>
     </div>
+
+
     
-    <!-- 存储信息模态框 -->
-    <div id="localStorageInfoModal" class="modal-overlay">
-        <div class="modal">
-            <div class="modal-title">
-                <i class="fas fa-info-circle mr-2"></i> 本地存储信息
-            </div>
-            <div class="modal-content">
-                <div id="storageInfoContent">
-                    <!-- 存储信息将通过JavaScript动态生成 -->
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button id="closeLocalStorageInfoBtn" class="btn btn-secondary">关闭</button>
-            </div>
-        </div>
-    </div>
+
     
     <!-- 通知组件 -->
     <div id="notification" class="notification"></div>
@@ -2570,6 +3580,7 @@
 
             // 清空所有标签
             safeAddEventListener('clearAllBtn', 'click', clearAllTags);
+            safeAddEventListener('translateSelectedBtn', 'click', translateSelectedTags);
 
             // 复制提示词
             safeAddEventListener('copyPrompt', 'click', copyPrompt);
@@ -2593,7 +3604,7 @@
             safeAddEventListener('newPresetBtn', 'click', openNewPresetModal);
 
             // 数据管理
-            safeAddEventListener('showDataManagementBtn', 'click', openDataManagementModal);
+
 
             // 模态框关闭按钮
             safeAddEventListener('cancelEditTagBtn', 'click', () => {
@@ -4165,6 +5176,44 @@
             }
         }
 
+        // 放大镜预览相关函数 (Lightbox模式)
+        let lightbox = null;
+        let lightboxImg = null;
+        
+        function createLightbox() {
+            if (!lightbox) {
+                lightbox = document.createElement('div');
+                lightbox.className = 'image-lightbox';
+                
+                lightboxImg = document.createElement('img');
+                lightbox.appendChild(lightboxImg);
+                
+                // 移除关闭按钮，因为是悬浮触发
+                
+                document.body.appendChild(lightbox);
+            }
+        }
+        
+        function showLightbox(src) {
+            createLightbox();
+            lightboxImg.src = src;
+            lightbox.classList.add('active');
+            document.body.style.overflow = 'hidden'; // 防止背景滚动
+        }
+        
+        function hideLightbox() {
+            if (lightbox) {
+                lightbox.classList.remove('active');
+                document.body.style.overflow = '';
+                // 动画结束后清空src
+                setTimeout(() => {
+                    if (!lightbox.classList.contains('active')) {
+                        lightboxImg.src = '';
+                    }
+                }, 300);
+            }
+        }
+
         function renderPresets() {
             console.log('正在渲染Preset...');
             const content = document.getElementById('presetContent');
@@ -4248,12 +5297,15 @@
                             </div>
                             <p class="text-gray-600 text-sm mb-3">${preset.description}</p>
                             ${preset.image ? `
-                                <div class="mb-3">
-                                    <img src="${preset.image}" alt="${preset.name}" class="w-full max-h-48 object-contain object-center rounded-lg">
+                                <div class="preset-image-wrapper">
+                                    <img src="${preset.image}" alt="${preset.name}" class="preset-image">
+                                    <div class="magnifier-btn" data-image-src="${preset.image}">
+                                        <i class="fas fa-search-plus"></i>
+                                    </div>
                                 </div>
                             ` : ''}
                             <div class="mb-3">
-                                <div class="bg-gray-800 text-green-400 p-3 rounded-lg font-mono text-sm overflow-x-auto">
+                                <div class="bg-gray-800 text-green-400 p-3 rounded-lg font-mono text-sm overflow-auto h-[80px]">
                                     ${preset.prompt}
                                 </div>
                             </div>
@@ -4270,6 +5322,18 @@
                 });
 
                 content.innerHTML = html;
+                
+                // 绑定放大镜事件 (改为鼠标悬浮打开Lightbox)
+                document.querySelectorAll('.magnifier-btn').forEach(btn => {
+                    btn.addEventListener('mouseenter', function(e) {
+                        const src = this.dataset.imageSrc;
+                        showLightbox(src);
+                    });
+                    
+                    btn.addEventListener('mouseleave', function() {
+                        hideLightbox();
+                    });
+                });
                 
                 // 绑定事件
                 document.querySelectorAll('.apply-preset-btn').forEach(btn => {
@@ -4889,7 +5953,7 @@
         }
 
         // 修复问题1：添加解析粘贴功能
-        function pasteAnalyze() {
+        async function pasteAnalyze() {
             const promptElement = document.getElementById('positivePrompt');
             const parsedContainer = document.getElementById('parsedTagsContainer');
             
@@ -4905,15 +5969,28 @@
             }
 
             try {
-                // 显示解析中状态
                 parsedContainer.style.display = 'block';
                 parsedContainer.innerHTML = '<div class="text-center py-4"><div class="loading"></div> 正在解析提示词...</div>';
 
-                // 简单的标签解析逻辑
-                setTimeout(() => {
-                    const tags = parsePromptTags(prompt);
-                    displayParsedTags(tags);
-                }, 500);
+                const tags = parsePromptTags(prompt);
+                
+                parsedContainer.innerHTML = '<div class="text-center py-4"><div class="loading"></div> 正在解析并翻译...</div>';
+                
+                const tagsToTranslate = tags.filter(t => !t.isExisting && /^[a-zA-Z0-9\s\p{P}]+$/u.test(t.text));
+                
+                if (tagsToTranslate.length > 0) {
+                     const texts = tagsToTranslate.map(t => t.text);
+                     const uniqueTexts = [...new Set(texts)];
+                     const translations = await translateTags(uniqueTexts);
+                     
+                     tags.forEach(t => {
+                         if (translations[t.text]) {
+                             t.translation = translations[t.text];
+                         }
+                     });
+                }
+                
+                displayParsedTags(tags);
             } catch (error) {
                 console.error('解析提示词失败:', error);
                 parsedContainer.innerHTML = '<div class="text-red-500 text-center py-4">解析失败: ' + error.message + '</div>';
@@ -4988,11 +6065,13 @@
                     `已存在于${getCategoryName(tag.category)}分类` : 
                     '点击添加为新标签';
                 
+                const displayText = tag.translation ? `${tag.text} (${tag.translation})` : tag.text;
+                
                 html += `
                     <span class="parsed-tag ${tagClass}" 
                           data-index="${index}"
                           title="${tagTitle}">
-                        ${tag.text}
+                        ${displayText}
                     </span>
                 `;
             });
@@ -5025,7 +6104,11 @@
                         showNotification(`已添加标签: ${tag.text}`, 'success');
                     } else {
                         // 打开新建标签模态框
-                        openParseNewTagModal(tag.text);
+                        if (tag.translation) {
+                            openParseNewTagModal(tag.text, tag.translation);
+                        } else {
+                            openParseNewTagModal(tag.text);
+                        }
                     }
                 });
             });
@@ -5047,7 +6130,7 @@
                     newTags.forEach(tag => {
                         const newTag = {
                             id: 'tag_' + Date.now() + Math.random().toString(36).substr(2, 9),
-                            name: tag.text,
+                            name: tag.translation || tag.text,
                             text: tag.text,
                             color: '#8B5CF6',
                             group: 'default',
@@ -5117,10 +6200,62 @@
             }
         }
 
+        async function translateSelectedTags() {
+            if (!settings.selectedTags || settings.selectedTags.length === 0) {
+                showNotification('没有已选择的标签', 'warning');
+                return;
+            }
+
+            const btn = document.getElementById('translateSelectedBtn');
+            const originalHtml = btn.innerHTML;
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+
+            try {
+                const tagsToTranslate = settings.selectedTags.filter(t => {
+                    return t.name === t.text && /^[a-zA-Z0-9\s\p{P}]+$/u.test(t.text);
+                });
+
+                if (tagsToTranslate.length === 0) {
+                    showNotification('没有需要翻译的标签 (名字与内容相同且为英文)', 'info');
+                    return;
+                }
+
+                showNotification(`正在翻译 ${tagsToTranslate.length} 个标签...`, 'info');
+
+                const texts = tagsToTranslate.map(t => t.text);
+                const uniqueTexts = [...new Set(texts)];
+                const translations = await translateTags(uniqueTexts);
+                
+                let updatedCount = 0;
+                settings.selectedTags.forEach(t => {
+                    if (translations[t.text]) {
+                        t.name = translations[t.text]; 
+                        updatedCount++;
+                    }
+                });
+
+                if (updatedCount > 0) {
+                    updateSelectedTagsDisplay();
+                    saveData();
+                    showNotification(`已翻译 ${updatedCount} 个标签`, 'success');
+                } else {
+                    showNotification('未能翻译任何标签', 'warning');
+                }
+
+            } catch (error) {
+                console.error('Translation error:', error);
+                showNotification('翻译出错: ' + error.message, 'error');
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = originalHtml;
+            }
+        }
+
         // 打开解析新建标签模态框
-        function openParseNewTagModal(tagText) {
+        function openParseNewTagModal(tagText, defaultName = '') {
             document.getElementById('parseTagText').value = tagText;
-            document.getElementById('parseTagName').value = '';
+            document.getElementById('parseTagName').value = defaultName;
             document.getElementById('parseTagColor').value = '#8B5CF6';
             
             // 加载分类选项
@@ -5874,259 +7009,9 @@
             }
         }
 
-        function openDataManagementModal() {
-            document.getElementById('dataManagementModal').classList.add('show');
-        }
 
-        function exportAllData() {
-            const exportData = {
-                mainCategories: settings.mainCategories,
-                tags: settings.tags,
-                groups: settings.groups,
-                presetCategories: settings.presetCategories,
-                presets: settings.presets,
-                settings: {
-                    showPlusMinus: settings.showPlusMinus,
-                    weightSymbol: settings.weightSymbol,
-                    showDelete: settings.showDelete,
-                    showR18Groups: settings.showR18Groups,
-                    showNegative: settings.showNegative,
-                    favorites: settings.favorites
-                },
-                version: '3.4.11',
-                作者: 'Mayi',
-                Github: 'https://clay2001.github.io/Prompt-UI/',
-                exportDate: new Date().toISOString()
-            };
 
-            const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `comfyui_prompt_generator_data_${new Date().toISOString().split('T')[0]}.json`;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            URL.revokeObjectURL(url);
 
-            showNotification('数据导出成功', 'success');
-        }
-
-        function showImportOptions() {
-            document.getElementById('importOptions').classList.add('show');
-        }
-
-        function hideImportOptions() {
-            document.getElementById('importOptions').classList.remove('show');
-            document.getElementById('importFile').value = '';
-        }
-
-        function handleFileImport(event) {
-            const file = event.target.files[0];
-            if (!file) return;
-
-            const reader = new FileReader();
-            reader.onload = function(e) {
-                try {
-                    const importedData = JSON.parse(e.target.result);
-                    
-                    // 验证数据格式
-                    if (!importedData.mainCategories || !importedData.tags || !importedData.groups || !importedData.presetCategories || !importedData.presets) {
-                        throw new Error('数据格式不正确');
-                    }
-
-                    // 确认导入
-                    if (confirm('确定要导入数据吗？这将覆盖现有数据。')) {
-                        // 导入数据
-                        settings.mainCategories = importedData.mainCategories;
-                        settings.tags = importedData.tags;
-                        settings.groups = importedData.groups;
-                        settings.presetCategories = importedData.presetCategories;
-                        settings.presets = importedData.presets;
-
-                        // 导入设置
-                        if (importedData.settings) {
-                            settings.showPlusMinus = importedData.settings.showPlusMinus !== undefined ? importedData.settings.showPlusMinus : true;
-                            settings.weightSymbol = importedData.settings.weightSymbol || '()';
-                            settings.showDelete = importedData.settings.showDelete !== undefined ? importedData.settings.showDelete : true;
-                            settings.showR18Groups = importedData.settings.showR18Groups !== undefined ? importedData.settings.showR18Groups : false;
-                            settings.showNegative = importedData.settings.showNegative !== undefined ? importedData.settings.showNegative : false;
-                            settings.favorites = importedData.settings.favorites || [];
-                        }
-
-                        // 强制将所有分类的isSystem设置为false
-                        settings.mainCategories.forEach(category => {
-                            category.isSystem = false;
-                        });
-
-                        settings.presetCategories.forEach(category => {
-                            category.isSystem = false;
-                        });
-
-                        // 为旧数据添加评分和收藏字段
-                        Object.keys(settings.presets).forEach(category => {
-                            settings.presets[category].forEach(preset => {
-                                if (preset.rating === undefined) preset.rating = 5;
-                                if (preset.favorite === undefined) preset.favorite = false;
-                            });
-                        });
-
-                        saveData();
-                        renderTagTabButtons();
-                        renderPresetTabButtons();
-                        renderTags();
-                        renderPresets();
-                        updateSelectedTagsDisplay();
-                        updatePrompt();
-
-                        showNotification('数据导入成功！页面已更新', 'success');
-                    }
-                } catch (error) {
-                    console.error('导入数据失败:', error);
-                    showNotification('导入失败：文件格式错误或内容损坏', 'danger');
-                }
-
-                hideImportOptions();
-            };
-
-            reader.readAsText(file);
-        }
-
-        function resetAllData() {
-            if (confirm('确定要重置所有数据吗？这将清除所有自定义数据并恢复到初始状态。')) {
-                try {
-                    // 清除localStorage
-                    localStorage.removeItem('comfyui_v3_16_1015_main_categories');
-                    localStorage.removeItem('comfyui_v3_16_1015_tags');
-                    localStorage.removeItem('comfyui_v3_16_1015_groups');
-                    localStorage.removeItem('comfyui_v3_16_1015_preset_categories');
-                    localStorage.removeItem('comfyui_v3_16_1015_presets');
-                    localStorage.removeItem('comfyui_v3_16_1015_settings');
-
-                    // 重新加载默认数据
-                    settings.mainCategories = JSON.parse(JSON.stringify(defaultMainCategories));
-                    settings.tags = JSON.parse(JSON.stringify(defaultTags));
-                    settings.groups = JSON.parse(JSON.stringify(defaultGroups));
-                    settings.presetCategories = JSON.parse(JSON.stringify(defaultPresetCategories));
-                    settings.presets = JSON.parse(JSON.stringify(defaultPresets));
-                    settings.showPlusMinus = true;
-                    settings.weightSymbol = '()';
-                    settings.showDelete = true;
-                    settings.showR18Groups = false;
-                    settings.showNegative = false;
-                    settings.currentTab = 'favorites';
-                    settings.currentPresetTab = 'anime';
-                    settings.selectedTags = [];
-                    settings.favorites = [];
-
-                    saveData();
-                    renderTagTabButtons();
-                    renderPresetTabButtons();
-                    renderTags();
-                    renderPresets();
-                    updateSelectedTagsDisplay();
-                    updatePrompt();
-
-                    showNotification('已重置所有数据到初始状态', 'success');
-                } catch (error) {
-                    console.error('重置数据失败:', error);
-                    showNotification('数据重置失败，请重试', 'danger');
-                }
-            }
-        }
-
-        function showLocalStorageInfo() {
-            try {
-                const info = [];
-                const keys = [
-                    'comfyui_v3_16_1015_main_categories',
-                    'comfyui_v3_16_1015_tags',
-                    'comfyui_v3_16_1015_groups',
-                    'comfyui_v3_16_1015_preset_categories',
-                    'comfyui_v3_16_1015_presets',
-                    'comfyui_v3_16_1015_settings'
-                ];
-
-                let totalSize = 0;
-                keys.forEach(key => {
-                    const value = localStorage.getItem(key);
-                    const size = value ? value.length : 0;
-                    totalSize += size;
-                    info.push({
-                        key: key,
-                        size: formatBytes(size),
-                        exists: !!value
-                    });
-                });
-
-                const container = document.getElementById('storageInfoContent');
-                container.innerHTML = `
-                    <div class="space-y-4">
-                        <div class="text-center">
-                            <h4 class="font-semibold mb-2">本地存储使用情况</h4>
-                            <p class="text-lg font-bold text-primary">总计: ${formatBytes(totalSize)}</p>
-                            <small class="text-gray-600">约${Math.round(totalSize / 1024)} KB</small>
-                        </div>
-                        <div class="space-y-2">
-                            ${info.map(item => `
-                                <div class="flex justify-between items-center p-2 bg-gray-50 rounded">
-                                    <span class="text-sm">${item.key.replace('comfyui_v3_16_1015_', '')}</span>
-                                    <span class="text-sm font-semibold ${item.exists ? 'text-green-600' : 'text-gray-400'}">
-                                        ${item.exists ? item.size : '不存在'}
-                                    </span>
-                                </div>
-                            `).join('')}
-                        </div>
-                        <div class="mt-4 p-3 bg-blue-50 rounded border border-blue-200">
-                            <h5 class="font-semibold text-blue-800 mb-2">数据统计</h5>
-                            <div class="text-sm space-y-1">
-                                <div class="flex justify-between">
-                                    <span>主分类数量:</span>
-                                    <span class="font-semibold">${settings.mainCategories.length}</span>
-                                </div>
-                                <div class="flex justify-between">
-                                    <span>标签总数:</span>
-                                    <span class="font-semibold">${Object.values(settings.tags).reduce((sum, tags) => sum + tags.length, 0)}</span>
-                                </div>
-                                <div class="flex justify-between">
-                                    <span>分组总数:</span>
-                                    <span class="font-semibold">${Object.values(settings.groups).reduce((sum, groups) => sum + groups.length, 0)}</span>
-                                </div>
-                                <div class="flex justify-between">
-                                    <span>Prompt分类数量:</span>
-                                    <span class="font-semibold">${settings.presetCategories.length}</span>
-                                </div>
-                                <div class="flex justify-between">
-                                    <span>Prompt总数:</span>
-                                    <span class="font-semibold">${Object.values(settings.presets).reduce((sum, presets) => sum + presets.length, 0)}</span>
-                                </div>
-                                <div class="flex justify-between">
-                                    <span>收藏标签数量:</span>
-                                    <span class="font-semibold">${settings.favorites.length}</span>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                `;
-
-                document.getElementById('localStorageInfoModal').classList.add('show');
-            } catch (error) {
-                console.error('获取存储信息失败:', error);
-                showNotification('获取存储信息失败', 'error');
-            }
-        }
-
-        function formatBytes(bytes, decimals = 2) {
-            if (bytes === 0) return '0 Bytes';
-
-            const k = 1024;
-            const dm = decimals < 0 ? 0 : decimals;
-            const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-
-            const i = Math.floor(Math.log(bytes) / Math.log(k));
-
-            return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
-        }
 
         function getRandomColor() {
             const colors = [
@@ -6145,6 +7030,260 @@
             <span class="mx-2">•</span>
             <span>版本 3.4.11</span>
             <span class="mx-2">•</span>
+            <a href="https://github.com/clay2001/Prompt-UI" target="_blank" rel="noopener" class="text-primary hover:underline">GitHub</a>
+        </div>
+    </footer>
+    <!-- 系统设置模态框 -->
+    <div id="settingsModal" class="modal-overlay">
+        <div class="bg-white w-full max-w-4xl rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+            <!-- 模态框头部 -->
+            <div class="flex justify-between items-center px-6 py-4 bg-gradient-to-r from-gray-50 to-gray-100 border-b border-gray-200">
+                <h3 class="text-xl font-bold text-gray-800 flex items-center gap-2">
+                    <i class="fas fa-cog text-primary"></i> 系统设置
+                </h3>
+                <button id="closeSettingsBtn" class="text-gray-400 hover:text-red-500 transition-colors w-8 h-8 flex items-center justify-center rounded-full hover:bg-red-50">
+                    <i class="fas fa-times text-lg"></i>
+                </button>
+            </div>
+            
+            <!-- 设置主体内容 -->
+            <div class="flex flex-1 overflow-hidden">
+                <!-- 左侧导航 -->
+                <div class="w-48 bg-gray-50 border-r border-gray-200 flex-shrink-0 py-4 flex flex-col gap-1">
+                    <button class="settings-tab-btn active px-6 py-3 text-left text-sm font-medium text-gray-700 hover:bg-gray-100 hover:text-primary transition-colors flex items-center gap-3 border-l-4 border-transparent" data-tab="base">
+                        <i class="fas fa-sliders-h w-4"></i> 基础设置
+                    </button>
+                    <button class="settings-tab-btn px-6 py-3 text-left text-sm font-medium text-gray-700 hover:bg-gray-100 hover:text-primary transition-colors flex items-center gap-3 border-l-4 border-transparent" data-tab="official">
+                        <i class="fas fa-building w-4"></i> 官方API
+                    </button>
+                    <button class="settings-tab-btn px-6 py-3 text-left text-sm font-medium text-gray-700 hover:bg-gray-100 hover:text-primary transition-colors flex items-center gap-3 border-l-4 border-transparent" data-tab="thirdparty">
+                        <i class="fas fa-globe w-4"></i> 第三方API
+                    </button>
+                    <button class="settings-tab-btn px-6 py-3 text-left text-sm font-medium text-gray-700 hover:bg-gray-100 hover:text-primary transition-colors flex items-center gap-3 border-l-4 border-transparent" data-tab="generation">
+                        <i class="fas fa-magic w-4"></i> 生成参数
+                    </button>
+                    <button class="settings-tab-btn px-6 py-3 text-left text-sm font-medium text-gray-700 hover:bg-gray-100 hover:text-primary transition-colors flex items-center gap-3 border-l-4 border-transparent" data-tab="data">
+                        <i class="fas fa-database w-4"></i> 数据管理
+                    </button>
+                </div>
+                
+                <!-- 右侧内容 -->
+                <div class="flex-1 overflow-y-auto p-6 bg-white">
+                    <!-- 基础设置 -->
+                    <div id="tab-base" class="settings-tab-content block">
+                        <h4 class="text-lg font-semibold text-gray-800 mb-4 pb-2 border-b">基础API设置</h4>
+                        <div class="space-y-4">
+                            <div class="form-group">
+                                <label class="block text-sm font-medium text-gray-700 mb-1">全局 API 服务商</label>
+                                <select id="settingGlobalProvider" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary transition bg-white">
+                                    <!-- Options will be populated by JS -->
+                                </select>
+                                <p class="text-xs text-gray-500 mt-1">选择默认使用的 API 服务商（支持官方预设与自定义接口）</p>
+                            </div>
+                            <div class="form-group">
+                                <label class="block text-sm font-medium text-gray-700 mb-1">默认 Model Name</label>
+                                <input type="text" id="settingDefaultModel" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary transition" placeholder="例如: gpt-3.5-turbo">
+                                <p class="text-xs text-gray-500 mt-1">全局默认的模型名称，优先级高于服务商预设</p>
+                            </div>
+                            <div class="form-group">
+                                <label class="block text-sm font-medium text-gray-700 mb-1">默认 API Base URL</label>
+                                <input type="text" id="settingBaseUrl" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary transition" placeholder="例如: https://api.openai.com/v1">
+                                <p class="text-xs text-gray-500 mt-1">仅当服务商未配置 Base URL 时生效</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- 官方API -->
+                    <div id="tab-official" class="settings-tab-content hidden">
+                        <h4 class="text-lg font-semibold text-gray-800 mb-4 pb-2 border-b">官方API配置</h4>
+                        <div class="space-y-6">
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4" id="apiProviderList">
+                                <!-- JS will populate this -->
+                            </div>
+                            
+                            <div id="apiConfigForm" class="bg-gray-50 rounded-xl p-4 border border-gray-200 hidden">
+                                <h5 class="font-medium text-gray-800 mb-3 flex items-center justify-between">
+                                    <span id="currentConfigTitle">配置 API</span>
+                                    <button id="closeConfigFormBtn" class="text-xs text-gray-500 hover:text-gray-700">关闭</button>
+                                </h5>
+                                <div class="space-y-3">
+                                    <input type="hidden" id="configProviderId">
+                                    <div>
+                                        <label class="block text-xs font-medium text-gray-700 mb-1">API Key</label>
+                                        <div class="relative">
+                                            <input type="password" id="configApiKey" class="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-primary pr-8" placeholder="sk-...">
+                                            <button type="button" class="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600" onclick="const input = document.getElementById('configApiKey'); input.type = input.type === 'password' ? 'text' : 'password'">
+                                                <i class="fas fa-eye"></i>
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <label class="block text-xs font-medium text-gray-700 mb-1">Model</label>
+                                        <input type="text" id="configModel" class="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-primary" placeholder="gpt-3.5-turbo">
+                                    </div>
+                                    <div>
+                                        <label class="block text-xs font-medium text-gray-700 mb-1">Base URL (可选)</label>
+                                        <input type="text" id="configBaseUrl" class="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-primary" placeholder="默认使用官方地址">
+                                    </div>
+                                    <div class="pt-2 flex justify-end">
+                                        <button id="saveApiConfigBtn" class="btn btn-primary btn-sm">保存配置</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- 第三方API -->
+                    <div id="tab-thirdparty" class="settings-tab-content hidden">
+                        <h4 class="text-lg font-semibold text-gray-800 mb-4 pb-2 border-b">第三方API接入</h4>
+                        <div class="space-y-4">
+                            <div class="flex justify-between items-center">
+                                <p class="text-sm text-gray-600">添加自定义的OpenAI兼容接口</p>
+                                <button id="addCustomApiBtn" class="btn btn-sm btn-success"><i class="fas fa-plus"></i> 新增接口</button>
+                            </div>
+                            <div id="customApiList" class="space-y-2">
+                                <!-- Custom APIs will be listed here -->
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- 功能配置 -->
+                    <div id="tab-generation" class="settings-tab-content hidden">
+                        <h4 class="text-lg font-semibold text-gray-800 mb-4 pb-2 border-b">功能配置 (AI Features)</h4>
+                        
+                        <!-- 提示词生成配置卡片 -->
+                        <div class="bg-white border border-gray-200 rounded-xl p-5 shadow-sm mb-6">
+                            <h5 class="font-bold text-gray-800 mb-3 flex items-center gap-2">
+                                <i class="fas fa-magic text-purple-500"></i> 提示词生成配置
+                            </h5>
+                            <p class="text-sm text-gray-500 mb-4">配置"AI生成"按钮的具体参数。此功能用于将自然语言描述转换为SD提示词。</p>
+                            
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">Temperature (随机性)</label>
+                                    <div class="flex items-center gap-3">
+                                        <input type="range" id="settingTemp" min="0" max="2" step="0.1" value="0.7" class="flex-1">
+                                        <span id="settingTempValue" class="text-sm font-mono w-8">0.7</span>
+                                    </div>
+                                    <p class="text-xs text-gray-500 mt-1">值越大生成结果越随机，值越小越固定</p>
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">Max Tokens (最大长度)</label>
+                                    <input type="number" id="settingMaxTokens" class="w-full px-3 py-2 border border-gray-300 rounded-md" value="2000">
+                                </div>
+                                <div class="md:col-span-2">
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">System Prompt (系统提示词)</label>
+                                    
+                                    <div class="flex items-center gap-2 mb-2">
+                                        <select id="settingSystemPromptSelect" class="flex-1 px-3 py-1.5 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-primary focus:border-primary">
+                                            <!-- JS will populate this -->
+                                        </select>
+                                        <button id="addSystemPromptBtn" class="btn btn-sm btn-info" title="新建预设">
+                                            <i class="fas fa-plus"></i>
+                                        </button>
+                                        <button id="saveSystemPromptBtn" class="btn btn-sm btn-success" title="保存当前修改">
+                                            <i class="fas fa-save"></i>
+                                        </button>
+                                        <button id="deleteSystemPromptBtn" class="btn btn-sm btn-danger" title="删除当前预设">
+                                            <i class="fas fa-trash"></i>
+                                        </button>
+                                    </div>
+                                    
+                                    <textarea id="settingSystemPrompt" class="w-full px-3 py-2 border border-gray-300 rounded-md h-24 text-sm font-mono" placeholder="你是一个专业的Stable Diffusion提示词专家..."></textarea>
+                                    <p class="text-xs text-gray-500 mt-1">定义AI的行为模式。默认配置已优化用于生成SD提示词。</p>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- 预留其他AI功能位置 -->
+                        <div class="bg-gray-50 border border-gray-200 rounded-xl p-5 border-dashed flex items-center justify-center text-gray-400">
+                            <span>更多AI功能（如图片反推、标签翻译）敬请期待...</span>
+                        </div>
+                    </div>
+
+                    <!-- 数据管理 -->
+                    <div id="tab-data" class="settings-tab-content hidden">
+                        <h4 class="text-lg font-semibold text-gray-800 mb-4 pb-2 border-b">数据交换与安全</h4>
+                        <div class="space-y-4">
+                            <div class="bg-blue-50 p-4 rounded-lg border border-blue-100">
+                                <h5 class="font-semibold text-blue-800 mb-2">数据备份</h5>
+                                <p class="text-sm text-blue-600 mb-3">导出所有配置和自定义数据（含API密钥，请妥善保管）</p>
+                                <div class="flex gap-3">
+                                    <button id="exportDataBtn" class="btn btn-primary"><i class="fas fa-file-export"></i> 导出JSON</button>
+                                    <button id="importDataBtn" class="btn btn-info"><i class="fas fa-file-import"></i> 导入JSON</button>
+                                    <input type="file" id="importDataInput" class="hidden" accept=".json">
+                                </div>
+                            </div>
+                            
+                            <div class="bg-yellow-50 p-4 rounded-lg border border-yellow-100">
+                                <h5 class="font-semibold text-yellow-800 mb-2">安全选项</h5>
+                                <div class="flex items-center gap-2">
+                                    <input type="checkbox" id="encryptDataCheckbox" class="rounded text-primary focus:ring-primary">
+                                    <label for="encryptDataCheckbox" class="text-sm text-yellow-800">导出时加密敏感数据 (API Key)</label>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 底部按钮 -->
+            <div class="px-6 py-4 bg-gray-50 border-t border-gray-200 flex justify-end gap-3">
+                <button id="cancelSettingsBtn" class="btn btn-secondary">取消</button>
+                <button id="saveSettingsBtn" class="btn btn-primary">保存设置</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 数据选择模态框 -->
+    <div id="dataSelectionModal" class="modal-overlay">
+        <div class="modal">
+            <div class="modal-title">
+                <i class="fas fa-exchange-alt mr-2"></i> <span id="dataSelectionTitle">数据选择</span>
+            </div>
+            <div class="modal-content">
+                <p class="mb-4 text-gray-600" id="dataSelectionDesc">请选择需要操作的数据内容：</p>
+                <div class="space-y-3">
+                    <div class="flex items-center p-3 bg-gray-50 rounded-lg border border-gray-200">
+                        <input type="checkbox" id="selSystemConfig" class="w-5 h-5 text-primary rounded focus:ring-primary" checked>
+                        <div class="ml-3">
+                            <label for="selSystemConfig" class="block font-medium text-gray-700">系统配置</label>
+                            <p class="text-xs text-gray-500">API设置、模型参数、UI偏好等</p>
+                        </div>
+                    </div>
+                    <div class="flex items-center p-3 bg-gray-50 rounded-lg border border-gray-200">
+                        <input type="checkbox" id="selTagData" class="w-5 h-5 text-primary rounded focus:ring-primary" checked>
+                        <div class="ml-3">
+                            <label for="selTagData" class="block font-medium text-gray-700">标签数据</label>
+                            <p class="text-xs text-gray-500">自定义标签、分类、分组信息</p>
+                        </div>
+                    </div>
+                    <div class="flex items-center p-3 bg-gray-50 rounded-lg border border-gray-200">
+                        <input type="checkbox" id="selPromptData" class="w-5 h-5 text-primary rounded focus:ring-primary" checked>
+                        <div class="ml-3">
+                            <label for="selPromptData" class="block font-medium text-gray-700">Prompt数据</label>
+                            <p class="text-xs text-gray-500">预设Prompt、分类及包含的图片</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button id="cancelDataSelectionBtn" class="btn btn-secondary">取消</button>
+                <button id="confirmDataSelectionBtn" class="btn btn-primary">确定</button>
+            </div>
+        </div>
+    </div>
+
+    <style>
+    .settings-tab-btn.active {
+        background-color: #fff;
+        color: #4F46E5;
+        border-left-color: #4F46E5;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    }
+    </style>
+</body>
+</html>     <span class="mx-2">•</span>
             <a href="https://github.com/clay2001/Prompt-UI" target="_blank" rel="noopener" class="text-primary hover:underline">GitHub</a>
         </div>
     </footer>
