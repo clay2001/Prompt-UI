@@ -252,6 +252,28 @@
                      console.error('Write file failed:', relativePath, error);
                      throw error;
                  }
+            },
+            
+            // Delete file
+            async deleteFile(relativePath) {
+                if (!this.dirHandle) return false;
+                
+                try {
+                    const parts = relativePath.split('/');
+                    const filename = parts.pop();
+                    let currentHandle = this.dirHandle;
+                    
+                    for (const part of parts) {
+                        currentHandle = await currentHandle.getDirectoryHandle(part);
+                    }
+                    
+                    await currentHandle.removeEntry(filename);
+                    console.log('File deleted:', relativePath);
+                    return true;
+                } catch (error) {
+                    console.error('Delete file failed:', relativePath, error);
+                    return false;
+                }
             }
         };
 
@@ -827,7 +849,7 @@ ${JSON.stringify(tags)}`;
                         id: tag.existingTag.id,
                         name: tag.existingTag.name,
                         text: tag.existingTag.text,
-                        weight: 1.0
+                        weight: tag.weight // 使用解析出的权重
                     });
                 } else {
                     // 创建临时自定义标签
@@ -835,7 +857,7 @@ ${JSON.stringify(tags)}`;
                         id: 'temp_' + Date.now() + Math.random().toString(36).substr(2, 5),
                         name: tag.translation || tag.text,
                         text: tag.text,
-                        weight: 1.0,
+                        weight: tag.weight, // 使用解析出的权重
                         isTemp: true
                     });
                 }
@@ -1440,6 +1462,7 @@ ${JSON.stringify(tags)}`;
         
         .app-card {
             background: white;
+            max-height: 600px;
             border-radius: 16px;
             padding: 24px;
             margin-bottom: 20px;
@@ -2189,7 +2212,7 @@ ${JSON.stringify(tags)}`;
         
         /* 解析结果区域样式 */
         #parsedTagsContainer {
-            max-height: 200px;
+            
             overflow-y: auto;
             margin-top: 12px;
             padding: 8px;
@@ -2484,9 +2507,13 @@ ${JSON.stringify(tags)}`;
         /* 修复：已选择标签容器样式 */
         #selectedTags {
             min-height: 70px;
+            height: 100%;
+            max-height: 100%;
+            overflow-y: auto;
             display: flex;
             flex-wrap: wrap;
-            align-items: center;
+            align-content: flex-start;
+            align-items: flex-start;
         }
         
         /* 标签滚动容器样式 */
@@ -2669,6 +2696,51 @@ ${JSON.stringify(tags)}`;
             transform: scale(1);
         }
 
+    </style>
+    <style>
+        .tag-selected-for-import {
+            border: 2px solid #4F46E5 !important;
+            background-color: #EEF2FF !important;
+            position: relative;
+        }
+        .tag-selected-for-import::after {
+            content: '\f00c';
+            font-family: 'Font Awesome 6 Free';
+            font-weight: 900;
+            position: absolute;
+            top: -8px;
+            right: -8px;
+            background: #4F46E5;
+            color: white;
+            border-radius: 50%;
+            width: 16px;
+            height: 16px;
+            font-size: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 10;
+        }
+        #importTagsFloatingBar {
+            position: fixed;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: white;
+            padding: 10px 25px;
+            border-radius: 50px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.15);
+            z-index: 1000;
+            display: none;
+            animation: slideUp 0.3s ease-out;
+            border: 1px solid #e2e8f0;
+            align-items: center;
+            gap: 12px;
+        }
+        @keyframes slideUp {
+            from { transform: translate(-50%, 100%); opacity: 0; }
+            to { transform: translate(-50%, 0); opacity: 1; }
+        }
     </style>
 </head>
 <body class="min-h-screen flex flex-col bg-gray-50 text-slate-800">
@@ -6273,8 +6345,24 @@ ${JSON.stringify(tags)}`;
 
             if (settings.selectedTags.length === 0) {
                 container.innerHTML = '<p class="text-gray-400 text-center w-full self-center py-3">点击下方标签添加到这里...</p>';
+                // 隐藏导入栏
+                if (typeof updateImportBar === 'function') updateImportBar();
                 return;
             }
+
+            // 预处理：检查是否有翻译
+            settings.selectedTags.forEach(tag => {
+                // 如果当前显示的名称等于英文原文本（说明可能没有翻译），尝试从库中查找翻译
+                if (tag.name === tag.text) {
+                     for (const catId in settings.tags) {
+                         const found = settings.tags[catId].find(t => t.text.toLowerCase() === tag.text.toLowerCase());
+                         if (found && found.name && found.name !== found.text) {
+                             tag.name = found.name;
+                             break;
+                         }
+                     }
+                }
+            });
 
             let html = '';
             settings.selectedTags.forEach((tag, index) => {
@@ -6315,7 +6403,8 @@ ${JSON.stringify(tags)}`;
 
             // 绑定已选择标签的操作事件
             document.querySelectorAll('.selected-tag-btn').forEach(btn => {
-                btn.addEventListener('click', function() {
+                btn.addEventListener('click', function(e) {
+                    e.stopPropagation(); 
                     const index = parseInt(this.dataset.index);
                     const action = this.dataset.action;
 
@@ -6344,6 +6433,9 @@ ${JSON.stringify(tags)}`;
                     }
                 });
             });
+            
+            // 每次更新显示时，更新导入栏状态（可能会清除选中状态）
+            if (typeof updateImportBar === 'function') updateImportBar();
         }
 
         function updatePrompt() {
@@ -6780,37 +6872,10 @@ ${JSON.stringify(tags)}`;
 
                 const tags = parsePromptTags(prompt);
                 
-                parsedContainer.innerHTML = '<div class="text-center py-4"><div class="loading"></div> 正在解析并翻译...</div>';
+                // 移除自动翻译逻辑，仅解析
                 
-                const tagsToTranslate = tags.filter(t => !t.isExisting && /^[a-zA-Z0-9\s\p{P}]+$/u.test(t.text));
-                
-                if (tagsToTranslate.length > 0) {
-                     const texts = tagsToTranslate.map(t => t.text);
-                     const uniqueTexts = [...new Set(texts)];
-                     const translations = await translateTags(uniqueTexts);
-                     
-                     tags.forEach(t => {
-                         if (translations[t.text]) {
-                             t.translation = translations[t.text];
-                         }
-                     });
-                     
-                     // 同步翻译结果到已选择标签
-                     let selectionChanged = false;
-                     settings.selectedTags.forEach(selTag => {
-                         // 如果标签名称与内容相同（说明是未翻译状态）且有翻译结果
-                         if (selTag.name === selTag.text && translations[selTag.text]) {
-                             selTag.name = translations[selTag.text];
-                             selectionChanged = true;
-                         }
-                     });
-                     
-                     if (selectionChanged) {
-                         saveData();
-                         updateSelectedTagsDisplay();
-                     }
-                }
-                
+                // 保存解析结果到全局设置，供导入功能使用
+                settings.currentParsedTags = tags;
                 displayParsedTags(tags);
             } catch (error) {
                 console.error('解析提示词失败:', error);
@@ -6819,40 +6884,71 @@ ${JSON.stringify(tags)}`;
         }
 
         function parsePromptTags(prompt) {
-            // 简单的标签解析逻辑
-            // 这里可以根据实际需要扩展更复杂的解析规则
             const tags = [];
+            // 预处理：替换换行符为逗号，替换全角逗号
+            let cleanPrompt = prompt.replace(/[\n\r]+/g, ',').replace(/，/g, ',');
             
-            // 只按英文逗号分割
-            const parts = prompt.split(/,/).filter(part => part.trim() !== '');
+            // 分割
+            const parts = cleanPrompt.split(',').filter(p => p.trim() !== '');
             
             parts.forEach(part => {
-                const tagText = part.trim();
-                if (tagText) {
-                    // 检查是否为已存在的标签
-                    let existingTag = null;
-                    let category = null;
-                    
-                    // 搜索所有分类中的标签
-                    for (const catId in settings.tags) {
-                        const tag = settings.tags[catId].find(t => 
-                            t.text.toLowerCase() === tagText.toLowerCase() ||
-                            t.name.toLowerCase() === tagText.toLowerCase()
-                        );
-                        if (tag) {
-                            existingTag = tag;
-                            category = catId;
-                            break;
-                        }
+                let text = part.trim();
+                let weight = 1.0;
+                
+                if (!text) return;
+
+                // 解析权重 (tag:1.2)
+                // 简单的正则匹配，处理最常见的情况
+                // 注意：这不能处理嵌套复杂的情况，但对大多数生成结果足够
+                const weightMatch = text.match(/^\((.*):([0-9.]+)\)$/);
+                if (weightMatch) {
+                    text = weightMatch[1];
+                    weight = parseFloat(weightMatch[2]);
+                } else {
+                    // 解析括号层级 (tag) -> 1.1, ((tag)) -> 1.21
+                    // 简单统计两端括号
+                    while (text.length > 1 && text.startsWith('(') && text.endsWith(')')) {
+                        text = text.substring(1, text.length - 1);
+                        weight *= 1.1;
                     }
-                    
-                    tags.push({
-                        text: tagText,
-                        isExisting: !!existingTag,
-                        existingTag: existingTag,
-                        category: category
-                    });
+                    while (text.length > 1 && text.startsWith('[') && text.endsWith(']')) {
+                        text = text.substring(1, text.length - 1);
+                        weight *= 0.9;
+                    }
+                    while (text.length > 1 && text.startsWith('{') && text.endsWith('}')) {
+                        text = text.substring(1, text.length - 1);
+                        weight *= 1.05;
+                    }
                 }
+                
+                // 再次清理可能的空白
+                text = text.trim();
+                if (!text) return;
+
+                // 检查是否为已存在的标签
+                let existingTag = null;
+                let category = null;
+                
+                // 搜索所有分类中的标签
+                for (const catId in settings.tags) {
+                    const tag = settings.tags[catId].find(t => 
+                        t.text.toLowerCase() === text.toLowerCase() ||
+                        t.name.toLowerCase() === text.toLowerCase()
+                    );
+                    if (tag) {
+                        existingTag = tag;
+                        category = catId;
+                        break;
+                    }
+                }
+                
+                tags.push({
+                    text: text,
+                    weight: parseFloat(weight.toFixed(2)),
+                    isExisting: !!existingTag,
+                    existingTag: existingTag,
+                    category: category
+                });
             });
             
             return tags;
@@ -6877,7 +6973,7 @@ ${JSON.stringify(tags)}`;
                         已存在标签
                     </span>
                 </div>
-                <div class="flex flex-wrap gap-2">
+                <div class="flex flex-wrap gap-2 p-1">
             `;
 
             tags.forEach((tag, index) => {
@@ -6886,7 +6982,12 @@ ${JSON.stringify(tags)}`;
                     `已存在于${getCategoryName(tag.category)}分类` : 
                     '点击添加为新标签';
                 
-                const displayText = tag.translation ? `${tag.text} (${tag.translation})` : tag.text;
+                let displayText = tag.text;
+                if (tag.translation) {
+                    displayText = `${tag.text} (${tag.translation})`;
+                } else if (tag.isExisting && tag.existingTag && tag.existingTag.name && tag.existingTag.name !== tag.existingTag.text) {
+                    displayText = `${tag.text} (${tag.existingTag.name})`;
+                }
                 
                 html += `
                     <span class="parsed-tag ${tagClass}" 
@@ -6899,10 +7000,14 @@ ${JSON.stringify(tags)}`;
 
             html += `
                 </div>
-                <div class="mt-4 flex justify-between items-center">
+                <div class="mt-4 flex flex-wrap gap-2 items-center">
                     <button id="selectAllParsedTags" class="btn btn-sm btn-primary">
-                        <i class="fas fa-check"></i> 全选可添加标签
+                        <i class="fas fa-check-double"></i> 全选新标签
                     </button>
+                    <button id="selectAllTagsWithExisting" class="btn btn-sm btn-info">
+                        <i class="fas fa-check"></i> 选择全部
+                    </button>
+                    <div class="flex-grow"></div>
                     <button id="clearParsedTags" class="btn btn-sm btn-secondary">
                         <i class="fas fa-times"></i> 清空解析结果
                     </button>
@@ -6913,6 +7018,7 @@ ${JSON.stringify(tags)}`;
 
             // 绑定解析标签的点击事件
             document.querySelectorAll('.parsed-tag').forEach((span, index) => {
+                // 左键点击：原有逻辑
                 span.addEventListener('click', function() {
                     const tagIndex = parseInt(this.dataset.index);
                     const tag = tags[tagIndex];
@@ -6932,58 +7038,81 @@ ${JSON.stringify(tags)}`;
                         }
                     }
                 });
+
+                // 右键点击：选择逻辑
+                span.addEventListener('contextmenu', function(e) {
+                    e.preventDefault();
+                    this.classList.toggle('tag-selected-for-import');
+                    if (typeof updateImportBar === 'function') updateImportBar();
+                });
             });
 
-            // 全选可添加标签
+            // 全选新标签（可取消）
             const selectAllBtn = document.getElementById('selectAllParsedTags');
             if (selectAllBtn) {
                 selectAllBtn.addEventListener('click', function() {
-                    const newTags = tags.filter(tag => !tag.isExisting);
-                    if (newTags.length === 0) {
+                    const parsedTagElements = parsedContainer.querySelectorAll('.parsed-tag.new');
+                    if (parsedTagElements.length === 0) {
                         showNotification('没有可添加的新标签', 'info');
                         return;
                     }
-                    
-                    // 这里保持原有的prompt方式，因为全选需要批量处理
-                    const category = prompt('请选择分类:', 'custom');
-                    if (!category) return;
-                    
-                    newTags.forEach(tag => {
-                        const newTag = {
-                            id: 'tag_' + Date.now() + Math.random().toString(36).substr(2, 9),
-                            name: tag.translation || tag.text,
-                            text: tag.text,
-                            color: '#8B5CF6',
-                            group: 'default',
-                            pinned: false,
-                            allowPin: true,
-                            allowFavorite: true
-                        };
-                        
-                        if (!settings.tags[category]) {
-                            settings.tags[category] = [];
+
+                    // 检查是否已全选
+                    let allSelected = true;
+                    parsedTagElements.forEach(el => {
+                        if (!el.classList.contains('tag-selected-for-import')) {
+                            allSelected = false;
                         }
-                        
-                        settings.tags[category].push(newTag);
-                        
-                        // 添加到已选择标签
-                        settings.selectedTags.push({
-                            id: newTag.id,
-                            name: newTag.name,
-                            text: newTag.text,
-                            weight: 1.0
-                        });
                     });
+
+                    if (allSelected) {
+                        // 取消全选
+                        parsedTagElements.forEach(el => {
+                            el.classList.remove('tag-selected-for-import');
+                        });
+                        showNotification('已取消全选新标签', 'info');
+                    } else {
+                        // 全选
+                        parsedTagElements.forEach(el => {
+                            el.classList.add('tag-selected-for-import');
+                        });
+                        showNotification(`已选中 ${parsedTagElements.length} 个新标签`, 'success');
+                    }
                     
-                    saveData();
-                    renderTags();
-                    updateSelectedTagsDisplay();
-                    updatePrompt();
-                    
-                    showNotification(`已创建并添加 ${newTags.length} 个新标签`, 'success');
-                    
-                    // 隐藏解析结果
-                    parsedContainer.style.display = 'none';
+                    if (typeof updateImportBar === 'function') updateImportBar();
+                });
+            }
+
+            // 选择全部（包括已存在的）
+            const selectAllWithExistingBtn = document.getElementById('selectAllTagsWithExisting');
+            if (selectAllWithExistingBtn) {
+                selectAllWithExistingBtn.addEventListener('click', function() {
+                    const allParsedTags = parsedContainer.querySelectorAll('.parsed-tag');
+                    if (allParsedTags.length === 0) return;
+
+                    // 检查是否已全选
+                    let allSelected = true;
+                    allParsedTags.forEach(el => {
+                        if (!el.classList.contains('tag-selected-for-import')) {
+                            allSelected = false;
+                        }
+                    });
+
+                    if (allSelected) {
+                        // 取消全选
+                        allParsedTags.forEach(el => {
+                            el.classList.remove('tag-selected-for-import');
+                        });
+                        showNotification('已取消全选所有标签', 'info');
+                    } else {
+                        // 全选
+                        allParsedTags.forEach(el => {
+                            el.classList.add('tag-selected-for-import');
+                        });
+                        showNotification(`已选中所有 ${allParsedTags.length} 个标签`, 'success');
+                    }
+
+                    if (typeof updateImportBar === 'function') updateImportBar();
                 });
             }
 
@@ -7022,8 +7151,12 @@ ${JSON.stringify(tags)}`;
         }
 
         async function translateSelectedTags() {
-            if (!settings.selectedTags || settings.selectedTags.length === 0) {
-                showNotification('没有已选择的标签', 'warning');
+            // 翻译范围：
+            // 1. settings.selectedTags 中没有翻译的标签
+            // 2. settings.currentParsedTags 中没有翻译的标签 (如果存在)
+            
+            if (settings.selectedTags.length === 0 && (!settings.currentParsedTags || settings.currentParsedTags.length === 0)) {
+                showNotification('没有需要翻译的标签', 'warning');
                 return;
             }
 
@@ -7033,33 +7166,61 @@ ${JSON.stringify(tags)}`;
             btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
 
             try {
+                // 1. 收集已选择区域的待翻译标签
                 const tagsToTranslate = settings.selectedTags.filter(t => {
                     return t.name === t.text && /^[a-zA-Z0-9\s\p{P}]+$/u.test(t.text);
                 });
+                
+                // 2. 收集解析结果区域的待翻译标签
+                let parsedTagsToTranslate = [];
+                if (settings.currentParsedTags && settings.currentParsedTags.length > 0) {
+                     parsedTagsToTranslate = settings.currentParsedTags.filter(t => 
+                        !t.isExisting && 
+                        !t.translation && 
+                        /^[a-zA-Z0-9\s\p{P}]+$/u.test(t.text)
+                     );
+                }
 
-                if (tagsToTranslate.length === 0) {
-                    showNotification('没有需要翻译的标签 (名字与内容相同且为英文)', 'info');
+                // 合并去重
+                const allTexts = [...tagsToTranslate.map(t => t.text), ...parsedTagsToTranslate.map(t => t.text)];
+                const uniqueTexts = [...new Set(allTexts)];
+
+                if (uniqueTexts.length === 0) {
+                    showNotification('所有标签均已有翻译', 'info');
                     return;
                 }
 
-                showNotification(`正在翻译 ${tagsToTranslate.length} 个标签...`, 'info');
-
-                const texts = tagsToTranslate.map(t => t.text);
-                const uniqueTexts = [...new Set(texts)];
+                showNotification(`正在翻译 ${uniqueTexts.length} 个标签...`, 'info');
                 const translations = await translateTags(uniqueTexts);
-                
+
                 let updatedCount = 0;
+                
+                // 更新已选择标签
                 settings.selectedTags.forEach(t => {
                     if (translations[t.text]) {
                         t.name = translations[t.text]; 
                         updatedCount++;
                     }
                 });
+                
+                // 更新解析结果标签
+                let parsedUpdated = false;
+                if (settings.currentParsedTags) {
+                    settings.currentParsedTags.forEach(t => {
+                        if (translations[t.text]) {
+                            t.translation = translations[t.text];
+                            parsedUpdated = true;
+                        }
+                    });
+                }
 
-                if (updatedCount > 0) {
+                if (updatedCount > 0 || parsedUpdated) {
                     updateSelectedTagsDisplay();
+                    if (parsedUpdated) {
+                        displayParsedTags(settings.currentParsedTags);
+                    }
                     saveData();
-                    showNotification(`已翻译 ${updatedCount} 个标签`, 'success');
+                    showNotification(`翻译完成`, 'success');
                 } else {
                     showNotification('未能翻译任何标签', 'warning');
                 }
@@ -7663,6 +7824,11 @@ ${JSON.stringify(tags)}`;
                 categorySelect.appendChild(option);
             });
 
+            // Auto-select current category if valid
+            if (settings.currentPresetTab && settings.currentPresetTab !== 'favorites') {
+                categorySelect.value = settings.currentPresetTab;
+            }
+
             document.getElementById('newPresetName').value = '';
             document.getElementById('newPresetDescription').value = '';
             document.getElementById('newPresetPrompt').value = '';
@@ -7682,8 +7848,8 @@ ${JSON.stringify(tags)}`;
             const rating = parseInt(document.getElementById('newPresetRating').value);
             const imageData = document.getElementById('newPresetImageData').value;
 
-            if (!name || !category || !prompt) {
-                showNotification('名称、分类和Prompt内容不能为空', 'error');
+            if (!category || (!prompt && !promptXml)) {
+                showNotification('分类和Prompt内容(SD或XML)不能为空', 'error');
                 return;
             }
 
@@ -7768,8 +7934,8 @@ ${JSON.stringify(tags)}`;
             const rating = parseInt(document.getElementById('editPresetRating').value);
             const imageData = document.getElementById('editPresetImageData').value;
 
-            if (!name || !newCategory || !prompt) {
-                showNotification('名称、分类和Prompt内容不能为空', 'error');
+            if (!newCategory || (!prompt && !promptXml)) {
+                showNotification('分类和Prompt内容(SD或XML)不能为空', 'error');
                 return;
             }
 
@@ -7788,6 +7954,11 @@ ${JSON.stringify(tags)}`;
                         settings.presets[newCategory] = [];
                     }
                     settings.presets[newCategory].push(preset);
+                }
+
+                // 如果图片发生变化，且旧图片是本地文件，则删除旧文件
+                if (imageData && imageData !== preset.image && preset.image && preset.image.startsWith('images/') && FileSystemManager.dirHandle) {
+                     FileSystemManager.deleteFile(preset.image);
                 }
 
                 // 更新Preset信息
@@ -7819,6 +7990,13 @@ ${JSON.stringify(tags)}`;
             if (confirm('确定要删除这个Prompt吗？')) {
                 const index = settings.presets[category].findIndex(p => p.id === presetId);
                 if (index > -1) {
+                    const preset = settings.presets[category][index];
+                    
+                    // 删除本地文件
+                    if (preset.image && preset.image.startsWith('images/') && FileSystemManager.dirHandle) {
+                        FileSystemManager.deleteFile(preset.image);
+                    }
+                    
                     settings.presets[category].splice(index, 1);
                     saveData();
                     renderPresets();
@@ -7868,13 +8046,19 @@ ${JSON.stringify(tags)}`;
 
         async function handleAiGenerateMeta(targetType) {
             const promptId = targetType === 'new' ? 'newPresetPrompt' : 'editPresetPrompt';
+            const promptXmlId = targetType === 'new' ? 'newPresetPromptXml' : 'editPresetPromptXml';
             const nameId = targetType === 'new' ? 'newPresetName' : 'editPresetName';
             const descId = targetType === 'new' ? 'newPresetDescription' : 'editPresetDescription';
             
             const promptContent = document.getElementById(promptId).value.trim();
+            const promptXmlContent = document.getElementById(promptXmlId).value.trim();
             
-            if (!promptContent) {
-                showNotification('请先输入SD Prompt内容', 'warning');
+            // Combine both SD and XML content to give AI more context
+            // If one is empty, it will just use the other. If both are present, it uses both.
+            const contentToUse = [promptContent, promptXmlContent].filter(Boolean).join('\n\n');
+            
+            if (!contentToUse) {
+                showNotification('请先输入Prompt内容 (SD 或 XML)', 'warning');
                 return;
             }
             
@@ -7885,22 +8069,27 @@ ${JSON.stringify(tags)}`;
             btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 生成中...';
             
             try {
-                // Simulate API call delay
-                await new Promise(resolve => setTimeout(resolve, 1500));
+                const systemPrompt = settings.metaSystemPrompt || "你是一个专业的AI助手，请根据提供的Stable Diffusion提示词，生成一个简短的中文标题（name）和一段详细的中文描述（description）。请以JSON格式返回，包含name和description两个字段。";
                 
-                // Mock result - In real app, this would use settings.metaSystemPrompt to call AI
-                const mockName = "AI生成标题_" + Math.floor(Math.random() * 1000);
-                const mockDesc = "这是一个由AI根据提示词自动生成的描述。它分析了提示词中的风格、人物和场景元素。";
+                const content = await callLLM([
+                    { role: 'system', content: systemPrompt },
+                    { role: 'user', content: contentToUse }
+                ], { jsonMode: true });
                 
-                // If we had a real API, we would use:
-                // const systemPrompt = settings.metaSystemPrompt || "Default system prompt...";
-                // const result = await callAiApi(systemPrompt, promptContent);
-                // const { name, description } = JSON.parse(result);
+                let jsonStr = content;
+                // Remove markdown code blocks if present
+                if (jsonStr.includes('```json')) {
+                    jsonStr = jsonStr.split('```json')[1].split('```')[0];
+                } else if (jsonStr.includes('```')) {
+                    jsonStr = jsonStr.split('```')[1].split('```')[0];
+                }
                 
-                document.getElementById(nameId).value = mockName;
-                document.getElementById(descId).value = mockDesc;
+                const result = JSON.parse(jsonStr.trim());
                 
-                showNotification('AI元数据生成成功 (模拟)', 'success');
+                if (result.name) document.getElementById(nameId).value = result.name;
+                if (result.description) document.getElementById(descId).value = result.description;
+                
+                showNotification('AI元数据生成成功', 'success');
             } catch (error) {
                 console.error('AI Generation Error:', error);
                 showNotification('生成失败: ' + error.message, 'error');
@@ -7947,7 +8136,231 @@ ${JSON.stringify(tags)}`;
             initSettings();
             setupImageUploadHandlers();
             setupRatingStarsHandlers();
+
+            // ==========================================
+            // 新增：右键选择与导入功能
+            // ==========================================
             
+            // 1. 右键选择标签
+            const selectedTagsContainer = document.getElementById('selectedTags');
+            if (selectedTagsContainer) {
+                selectedTagsContainer.addEventListener('contextmenu', function(e) {
+                    const item = e.target.closest('.selected-tag-item');
+                    if (item) {
+                        e.preventDefault();
+                        item.classList.toggle('tag-selected-for-import');
+                        if (typeof updateImportBar === 'function') updateImportBar();
+                    }
+                });
+            }
+
+            // 2. 导入栏逻辑
+            window.updateImportBar = function() {
+                const count = document.querySelectorAll('.tag-selected-for-import').length;
+                const bar = document.getElementById('importTagsFloatingBar');
+                const countSpan = document.getElementById('importSelectedCount');
+                if (bar && countSpan) {
+                    if (count > 0) {
+                        bar.style.display = 'flex';
+                        countSpan.textContent = count;
+                    } else {
+                        bar.style.display = 'none';
+                    }
+                }
+            };
+
+            // 3. 取消导入
+            const cancelImportBtn = document.getElementById('importTagsCancelBtn');
+            if (cancelImportBtn) {
+                cancelImportBtn.addEventListener('click', () => {
+                    document.querySelectorAll('.tag-selected-for-import').forEach(el => {
+                        el.classList.remove('tag-selected-for-import');
+                    });
+                    updateImportBar();
+                });
+            }
+
+            // 4. 确认导入 (API调用)
+            const confirmImportBtn = document.getElementById('importTagsConfirmBtn');
+            if (confirmImportBtn) {
+                confirmImportBtn.addEventListener('click', async () => {
+                    const selectedElements = document.querySelectorAll('.tag-selected-for-import');
+                    if (selectedElements.length === 0) return;
+
+                    const tagsToImport = [];
+                    selectedElements.forEach(el => {
+                        const index = parseInt(el.dataset.index);
+                        
+                        // 判断来源
+                        if (el.classList.contains('parsed-tag')) {
+                            // 来源：解析结果区域
+                            const tag = settings.currentParsedTags && settings.currentParsedTags[index];
+                            if (tag) {
+                                // 构造统一格式的标签对象
+                                tagsToImport.push({
+                                    text: tag.text,
+                                    name: tag.translation || (tag.existingTag ? tag.existingTag.name : tag.text),
+                                    // 如果是已有标签，保留ID以防万一需要去重
+                                    id: tag.existingTag ? tag.existingTag.id : undefined
+                                });
+                            }
+                        } else {
+                            // 来源：已选择标签区域
+                            if (settings.selectedTags[index]) {
+                                tagsToImport.push(settings.selectedTags[index]);
+                            }
+                        }
+                    });
+
+                    if (tagsToImport.length === 0) return;
+
+                    confirmImportBtn.disabled = true;
+                    confirmImportBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 处理中...';
+
+                    try {
+                        await classifyAndImportTags(tagsToImport);
+                        // 导入成功后清空选择
+                        document.querySelectorAll('.tag-selected-for-import').forEach(el => {
+                            el.classList.remove('tag-selected-for-import');
+                        });
+                        updateImportBar();
+                        showNotification('标签导入成功！', 'success');
+                    } catch (error) {
+                        console.error('Import failed:', error);
+                        showNotification('导入失败: ' + error.message, 'error');
+                    } finally {
+                        confirmImportBtn.disabled = false;
+                        confirmImportBtn.innerHTML = '<i class="fas fa-file-import mr-2"></i> 智能分类导入';
+                    }
+                });
+            }
+
+            // 5. API分类逻辑
+            async function classifyAndImportTags(tags) {
+                // 获取现有分类
+                const categories = settings.mainCategories.map(c => ({ id: c.id, name: c.name }));
+                // 如果没有分类，创建一个默认的
+                if (categories.length === 0) {
+                    categories.push({ id: 'default', name: '默认分类' });
+                }
+
+                const tagsText = tags.map(t => t.text).join(', ');
+                const prompt = `Please classify the following Stable Diffusion tags into the provided categories.
+Tags: ${tagsText}
+Categories: ${JSON.stringify(categories)}
+
+Return a JSON object where keys are category IDs and values are arrays of tag texts that belong to that category.
+If a tag doesn't fit well, put it in the most relevant category or the first one.
+Only return the JSON object.`;
+
+                try {
+                    const content = await callLLM([
+                        { role: 'system', content: 'You are a helpful assistant for classifying tags.' },
+                        { role: 'user', content: prompt }
+                    ], { jsonMode: true });
+
+                    let result = content;
+                     if (result.includes('```json')) {
+                        result = result.split('```json')[1].split('```')[0];
+                    } else if (result.includes('```')) {
+                        result = result.split('```')[1].split('```')[0];
+                    }
+                    const classification = JSON.parse(result.trim());
+
+                    // 处理导入
+                    let importCount = 0;
+                    for (const [catId, tagTexts] of Object.entries(classification)) {
+                        // 确保是有效的分类ID
+                        if (!settings.tags[catId]) {
+                            // 尝试按名字匹配
+                            const cat = settings.mainCategories.find(c => c.name === catId || c.id === catId);
+                            if (cat && settings.tags[cat.id]) {
+                                // 使用找到的ID
+                            } else {
+                                continue; 
+                            }
+                        }
+                        
+                        // 这里的逻辑稍微调整，确保使用正确的ID
+                        const targetCatId = settings.tags[catId] ? catId : (settings.mainCategories.find(c => c.id === catId)?.id);
+                        if (!targetCatId || !settings.tags[targetCatId]) continue;
+
+                        tagTexts.forEach(text => {
+                            const originalTag = tags.find(t => t.text === text);
+                            if (originalTag) {
+                                // 检查是否已存在
+                                const exists = settings.tags[targetCatId].some(t => t.text === text);
+                                if (!exists) {
+                                    settings.tags[targetCatId].push({
+                                        id: 'tag_' + Date.now() + Math.random().toString(36).substr(2, 5),
+                                        text: originalTag.text,
+                                        name: originalTag.name || originalTag.text,
+                                        color: '#3B82F6',
+                                        group: 'default'
+                                    });
+                                    importCount++;
+                                }
+                            }
+                        });
+                    }
+                    saveData();
+                    renderTags(); // 刷新显示
+                    return importCount;
+
+                } catch (e) {
+                    throw e;
+                }
+            }
+            
+            // 6. 导入Prompt管理按钮逻辑
+            const importToPromptBtn = document.getElementById('importToPromptBtn');
+            if (importToPromptBtn) {
+                importToPromptBtn.addEventListener('click', () => {
+                    const selectedElements = document.querySelectorAll('.tag-selected-for-import');
+                    if (selectedElements.length === 0) return;
+
+                    let tagsText = [];
+                    selectedElements.forEach(el => {
+                        const index = parseInt(el.dataset.index);
+                        
+                        // 判断来源
+                        if (el.classList.contains('parsed-tag')) {
+                            // 来源：解析结果区域
+                            const tag = settings.currentParsedTags && settings.currentParsedTags[index];
+                            if (tag) {
+                                tagsText.push(tag.text);
+                            }
+                        } else {
+                            // 来源：已选择标签区域
+                            if (settings.selectedTags[index]) {
+                                tagsText.push(settings.selectedTags[index].text);
+                            }
+                        }
+                    });
+
+                    if (tagsText.length === 0) return;
+
+                    // 打开新建Prompt模态框
+                    openNewPresetModal();
+                    
+                    // 延迟一点时间等待模态框打开和DOM更新，然后填充内容
+                    setTimeout(() => {
+                        const promptInput = document.getElementById('newPresetPrompt');
+                        if (promptInput) {
+                            promptInput.value = tagsText.join(', ');
+                        }
+                        
+                        // 清空选择状态并隐藏导入栏
+                        document.querySelectorAll('.tag-selected-for-import').forEach(el => {
+                            el.classList.remove('tag-selected-for-import');
+                        });
+                        updateImportBar();
+                        
+                        showNotification('已将选中的标签填入Prompt内容', 'success');
+                    }, 200);
+                });
+            }
+
             // Try to restore file system connection
             FileSystemManager.init();
         });
@@ -8253,5 +8666,18 @@ ${JSON.stringify(tags)}`;
         box-shadow: 0 1px 3px rgba(0,0,0,0.05);
     }
     </style>
+    <!-- 底部浮动导入栏 -->
+    <div id="importTagsFloatingBar">
+        <span class="font-medium text-gray-700">已选择 <span id="importSelectedCount" class="text-primary font-bold">0</span> 个标签</span>
+        <button id="importTagsConfirmBtn" class="btn btn-primary rounded-full px-5 py-1.5 text-sm shadow-md hover:shadow-lg transition-all">
+            <i class="fas fa-file-import mr-2"></i> 智能分类导入
+        </button>
+        <button id="importToPromptBtn" class="btn btn-success rounded-full px-5 py-1.5 text-sm shadow-md hover:shadow-lg transition-all">
+            <i class="fas fa-edit mr-2"></i> 导入Prompt管理
+        </button>
+        <button id="importTagsCancelBtn" class="w-8 h-8 flex items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors">
+            <i class="fas fa-times"></i>
+        </button>
+    </div>
 </body>
 </html>
