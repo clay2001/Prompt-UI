@@ -704,7 +704,7 @@ ${JSON.stringify(tags)}`;
             }
 
             const data = {
-                version: '3.4.11',
+                version: '4.1.2',
                 timestamp: new Date().toISOString(),
                 author: 'Mayi',
                 github: 'https://clay2001.github.io/Prompt-UI/'
@@ -3300,7 +3300,7 @@ ${JSON.stringify(tags)}`;
             
             try {
                 if (typeof showNotification === 'function') {
-                    showNotification('欢迎使用 Mayi Prompt UI 3.4.11', 'success');
+                    showNotification('欢迎使用 Mayi Prompt UI 4.1.2', 'success');
                 }
             } catch (error) {
                 console.error('显示通知时出错:', error);
@@ -7024,13 +7024,21 @@ ${JSON.stringify(tags)}`;
         
 
     </script>
-    <footer class="w-full mt-6 text-center text-xs text-slate-600 py-4 border-t border-slate-200 bg-white/60">
-        <div class="flex flex-wrap justify-center items-center gap-2">
-            <span>© 2025 Mayi Prompt UI</span>
-            <span class="mx-2">•</span>
-            <span>版本 3.4.11</span>
-            <span class="mx-2">•</span>
-            <a href="https://github.com/clay2001/Prompt-UI" target="_blank" rel="noopener" class="text-primary hover:underline">GitHub</a>
+    <footer class="w-full mt-8 py-6 border-t border-slate-200 bg-white/80 backdrop-blur-sm">
+        <div class="max-w-7xl mx-auto flex flex-col md:flex-row justify-center items-center gap-4 text-sm text-slate-600">
+            <div class="flex items-center gap-2">
+                <span class="font-semibold text-slate-700">Mayi Prompt UI</span>
+                <span class="px-2 py-0.5 rounded-full bg-primary/10 text-primary text-xs font-mono">v4.1.2</span>
+            </div>
+            <div class="hidden md:block w-1 h-1 rounded-full bg-slate-300"></div>
+            <div>
+                © 2026 Designed by <span class="font-medium text-slate-700">Mayi</span>
+            </div>
+            <div class="hidden md:block w-1 h-1 rounded-full bg-slate-300"></div>
+            <a href="https://github.com/clay2001/Prompt-UI" target="_blank" rel="noopener" class="flex items-center gap-1 text-slate-500 hover:text-primary transition-colors">
+                <i class="fab fa-github"></i>
+                <span>GitHub</span>
+            </a>
         </div>
     </footer>
     <!-- 系统设置模态框 -->
@@ -7060,7 +7068,7 @@ ${JSON.stringify(tags)}`;
                         <i class="fas fa-globe w-4"></i> 第三方API
                     </button>
                     <button class="settings-tab-btn px-6 py-3 text-left text-sm font-medium text-gray-700 hover:bg-gray-100 hover:text-primary transition-colors flex items-center gap-3 border-l-4 border-transparent" data-tab="generation">
-                        <i class="fas fa-magic w-4"></i> 生成参数
+                        <i class="fas fa-magic w-4"></i> 功能配置
                     </button>
                     <button class="settings-tab-btn px-6 py-3 text-left text-sm font-medium text-gray-700 hover:bg-gray-100 hover:text-primary transition-colors flex items-center gap-3 border-l-4 border-transparent" data-tab="data">
                         <i class="fas fa-database w-4"></i> 数据管理
