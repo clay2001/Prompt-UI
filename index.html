@@ -6,6 +6,7 @@
     <title>Mayi Prompt UI</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     <script>
         tailwind.config = {
             theme: {
@@ -25,6 +26,256 @@
                 }
             }
         }
+
+        // ==========================================
+        // File System Manager (Local Storage)
+        // ==========================================
+        
+        // Simple IndexedDB wrapper for storing handles
+        const IDB = {
+            dbName: 'mayi_prompt_db',
+            storeName: 'handles',
+            version: 1,
+            
+            async getDB() {
+                return new Promise((resolve, reject) => {
+                    const request = indexedDB.open(this.dbName, this.version);
+                    request.onupgradeneeded = (e) => {
+                        const db = e.target.result;
+                        if (!db.objectStoreNames.contains(this.storeName)) {
+                            db.createObjectStore(this.storeName);
+                        }
+                    };
+                    request.onsuccess = () => resolve(request.result);
+                    request.onerror = () => reject(request.error);
+                });
+            },
+            
+            async get(key) {
+                const db = await this.getDB();
+                return new Promise((resolve, reject) => {
+                    const tx = db.transaction(this.storeName, 'readonly');
+                    const store = tx.objectStore(this.storeName);
+                    const request = store.get(key);
+                    request.onsuccess = () => resolve(request.result);
+                    request.onerror = () => reject(request.error);
+                });
+            },
+            
+            async set(key, value) {
+                const db = await this.getDB();
+                return new Promise((resolve, reject) => {
+                    const tx = db.transaction(this.storeName, 'readwrite');
+                    const store = tx.objectStore(this.storeName);
+                    const request = store.put(value, key);
+                    request.onsuccess = () => resolve();
+                    request.onerror = () => reject(request.error);
+                });
+            }
+        };
+
+        const FileSystemManager = {
+            dirHandle: null,
+            
+            // Check if API is supported
+            isSupported: () => 'showDirectoryPicker' in window,
+            
+            async init() {
+                if (!this.isSupported()) return;
+                
+                try {
+                    // Try to restore handle from IndexedDB
+                    const handle = await IDB.get('project_root_handle');
+                    if (handle) {
+                        this.dirHandle = handle;
+                        
+                        // Check if we have permission already (rare, but possible in same session)
+                        const permission = await handle.queryPermission({ mode: 'readwrite' });
+                        if (permission === 'granted') {
+                            updateStorageStatus(true);
+                            console.log('Successfully restored file system connection');
+                        } else {
+                            // Permission needed
+                            updateStorageStatus(false, true); // true = needs reconnection
+                            console.log('File system handle restored, but permission needed');
+                        }
+                    }
+                } catch (e) {
+                    console.error('Failed to restore handle:', e);
+                }
+            },
+
+            // Connect to project folder
+            async connect() {
+                try {
+                    if (this.dirHandle) {
+                         // If we already have a handle (restored from DB), just verify permission
+                         const permission = await this.verifyPermission(this.dirHandle, true);
+                         if (permission) {
+                             showNotification('已恢复连接', 'success');
+                             updateStorageStatus(true);
+                             return true;
+                         }
+                         // If verification failed (e.g. user denied), fall through to pick new folder
+                    }
+
+                    // Open folder picker
+                    this.dirHandle = await window.showDirectoryPicker({
+                        mode: 'readwrite',
+                        id: 'mayi_prompt_project_root'
+                    });
+                    
+                    // Verify permission
+                    const permission = await this.verifyPermission(this.dirHandle, true);
+                    if (!permission) {
+                        throw new Error('Permission denied');
+                    }
+                    
+                    // Ensure images directory exists
+                    await this.dirHandle.getDirectoryHandle('images', { create: true });
+                    
+                    // Save handle to IndexedDB
+                    await IDB.set('project_root_handle', this.dirHandle);
+                    
+                    showNotification('已成功连接项目文件夹', 'success');
+                    updateStorageStatus(true);
+                    return true;
+                } catch (error) {
+                    console.error('Connection failed:', error);
+                    if (error.name !== 'AbortError') {
+                        showNotification('连接文件夹失败: ' + error.message, 'error');
+                    }
+                    updateStorageStatus(false);
+                    return false;
+                }
+            },
+            
+            // Verify permission
+            async verifyPermission(handle, readWrite) {
+                const options = {};
+                if (readWrite) {
+                    options.mode = 'readwrite';
+                }
+                // Check if permission was already granted
+                if ((await handle.queryPermission(options)) === 'granted') {
+                    return true;
+                }
+                // Request permission
+                if ((await handle.requestPermission(options)) === 'granted') {
+                    return true;
+                }
+                return false;
+            },
+            
+            // Save image file
+            async saveImage(file) {
+                // If not connected, try to connect first
+                if (!this.dirHandle) {
+                     // Try to load from DB one last time or prompt
+                     await this.init();
+                     if (!this.dirHandle) {
+                         throw new Error('Project folder not connected');
+                     }
+                }
+                
+                // Double check permission before writing
+                if ((await this.dirHandle.queryPermission({ mode: 'readwrite' })) !== 'granted') {
+                    const granted = await this.verifyPermission(this.dirHandle, true);
+                    if (!granted) throw new Error('Permission denied');
+                }
+                
+                try {
+                    const imagesDir = await this.dirHandle.getDirectoryHandle('images', { create: true });
+                    
+                    // Generate unique filename
+                    const ext = file.name.split('.').pop() || 'png';
+                    const filename = `${Date.now()}_${Math.random().toString(36).substr(2, 9)}.${ext}`;
+                    
+                    // Write file
+                    const fileHandle = await imagesDir.getFileHandle(filename, { create: true });
+                    const writable = await fileHandle.createWritable();
+                    await writable.write(file);
+                    await writable.close();
+                    
+                    return `images/${filename}`;
+                } catch (error) {
+                    console.error('Save image failed:', error);
+                    throw error;
+                }
+            },
+            
+            // Get file blob (for export)
+            async getFile(relativePath) {
+                if (!this.dirHandle) return null;
+                
+                // Check permission
+                if ((await this.dirHandle.queryPermission({ mode: 'readwrite' })) !== 'granted') {
+                    // Try to re-request permission if we are in a user gesture context, otherwise this might fail
+                    // Ideally we should prompt user before this operation
+                }
+                
+                try {
+                    const parts = relativePath.split('/');
+                    let currentHandle = this.dirHandle;
+                    
+                    for (let i = 0; i < parts.length - 1; i++) {
+                        currentHandle = await currentHandle.getDirectoryHandle(parts[i]);
+                    }
+                    
+                    const fileHandle = await currentHandle.getFileHandle(parts[parts.length - 1]);
+                    return await fileHandle.getFile();
+                } catch (error) {
+                    console.error('Get file failed:', error);
+                    return null;
+                }
+            },
+
+            // Write file (for import)
+            async writeFile(relativePath, blob) {
+                 if (!this.dirHandle) return;
+
+                 try {
+                    const parts = relativePath.split('/');
+                    const filename = parts.pop();
+                    let currentHandle = this.dirHandle;
+
+                    // Ensure directories exist
+                    for (const part of parts) {
+                        currentHandle = await currentHandle.getDirectoryHandle(part, { create: true });
+                    }
+
+                    const fileHandle = await currentHandle.getFileHandle(filename, { create: true });
+                    const writable = await fileHandle.createWritable();
+                    await writable.write(blob);
+                    await writable.close();
+                 } catch (error) {
+                     console.error('Write file failed:', relativePath, error);
+                     throw error;
+                 }
+            }
+        };
+
+        function updateStorageStatus(connected, needsPermission = false) {
+            const btn = document.getElementById('connectFolderBtn');
+            const desc = document.getElementById('connectFolderDesc');
+            
+            if (btn) {
+                if (connected) {
+                    btn.innerHTML = '<i class="fas fa-folder-open"></i> 已连接项目文件夹';
+                    btn.className = 'btn btn-success w-full';
+                    if (desc) desc.textContent = '已连接本地存储，图片将直接保存到磁盘。';
+                } else if (needsPermission) {
+                    btn.innerHTML = '<i class="fas fa-sync-alt"></i> 恢复连接 (无需重新选择)';
+                    btn.className = 'btn btn-warning w-full';
+                    if (desc) desc.textContent = '检测到上次使用的文件夹，点击按钮恢复权限。';
+                } else {
+                    btn.innerHTML = '<i class="fas fa-folder"></i> 连接项目文件夹 (推荐)';
+                    btn.className = 'btn btn-secondary w-full';
+                    if (desc) desc.textContent = '连接本地文件夹以启用图片存储和完整导入导出功能。图片将直接保存在您的磁盘上，不受浏览器容量限制。';
+                }
+            }
+        }
+
         // ==========================================
         // 系统设置与AI生成模块
         // ==========================================
@@ -233,6 +484,14 @@
             document.getElementById('closeConfigFormBtn').addEventListener('click', () => {
                 document.getElementById('apiConfigForm').classList.add('hidden');
             });
+
+            // Connect Folder Button
+            const connectBtn = document.getElementById('connectFolderBtn');
+            if (connectBtn) {
+                connectBtn.addEventListener('click', async () => {
+                    await FileSystemManager.connect();
+                });
+            }
             
             document.getElementById('saveApiConfigBtn').addEventListener('click', saveCurrentApiConfig);
             
@@ -549,6 +808,50 @@ ${JSON.stringify(tags)}`;
             }
         }
 
+        // 同步Prompt文本到已选标签列表
+        function syncSelectedTagsFromPrompt(promptText) {
+            console.log('正在同步标签:', promptText);
+            // 使用现有的解析逻辑
+            const tags = parsePromptTags(promptText);
+            const newSelectedTags = [];
+            
+            tags.forEach(tag => {
+                // 检查是否已经在列表中（避免重复）
+                if (newSelectedTags.some(t => t.text.toLowerCase() === tag.text.toLowerCase())) {
+                    return;
+                }
+
+                if (tag.isExisting && tag.existingTag) {
+                    // 使用现有标签数据
+                    newSelectedTags.push({
+                        id: tag.existingTag.id,
+                        name: tag.existingTag.name,
+                        text: tag.existingTag.text,
+                        weight: 1.0
+                    });
+                } else {
+                    // 创建临时自定义标签
+                    newSelectedTags.push({
+                        id: 'temp_' + Date.now() + Math.random().toString(36).substr(2, 5),
+                        name: tag.translation || tag.text,
+                        text: tag.text,
+                        weight: 1.0,
+                        isTemp: true
+                    });
+                }
+            });
+            
+            // 更新设置
+            settings.selectedTags = newSelectedTags;
+            saveData();
+            
+            // 更新UI
+            if (typeof renderTags === 'function') renderTags();
+            if (typeof updateSelectedTagsDisplay === 'function') updateSelectedTagsDisplay();
+            
+            // 注意：不调用 updatePrompt()，保留AI生成的原始文本格式
+        }
+
         async function handleAiGenerate() {
             const btn = document.getElementById('aiGenerateBtn');
             const originalHtml = btn.innerHTML;
@@ -619,7 +922,16 @@ ${JSON.stringify(tags)}`;
                 const content = data.choices[0].message.content;
                 
                 document.getElementById('positivePrompt').value = content;
-                document.getElementById('pasteAnalyzeBtn').click();
+                
+                // 自动同步到已选标签
+                if (typeof syncSelectedTagsFromPrompt === 'function') {
+                    syncSelectedTagsFromPrompt(content);
+                }
+                
+                // 同时触发解析视图
+                const pasteBtn = document.getElementById('pasteAnalyzeBtn');
+                if (pasteBtn) pasteBtn.click();
+                
                 showNotification('AI生成成功！', 'success');
                 
             } catch (error) {
@@ -693,7 +1005,7 @@ ${JSON.stringify(tags)}`;
             openDataSelectionModal('export');
         }
 
-        function executeExport() {
+        async function executeExport() {
             const exportConfig = document.getElementById('selSystemConfig').checked;
             const exportTags = document.getElementById('selTagData').checked;
             const exportPrompts = document.getElementById('selPromptData').checked;
@@ -747,79 +1059,184 @@ ${JSON.stringify(tags)}`;
                 }
             }
             
-            const blob = new Blob([exportContent], { type: 'application/json' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            const types = [];
-            if (exportConfig) types.push('config');
-            if (exportTags) types.push('tags');
-            if (exportPrompts) types.push('prompts');
-            
-            const typeStr = types.length === 3 ? 'full' : types.join('_');
-            
-            a.download = `mayi_prompt_backup_${typeStr}_${shouldEncrypt ? 'encrypted_' : ''}${new Date().toISOString().split('T')[0]}.json`;
-            a.click();
-            URL.revokeObjectURL(url);
-            showNotification('数据导出成功', 'success');
-            closeDataSelectionModal();
+            try {
+                // Use JSZip
+                const zip = new JSZip();
+                
+                // Add JSON data
+                zip.file('data.json', exportContent);
+                
+                // Add Images if FileSystem is connected
+                if (FileSystemManager.dirHandle) {
+                    const imagePaths = new Set();
+                    if (data.presets) {
+                        Object.values(data.presets).forEach(list => {
+                            list.forEach(p => {
+                                if (p.image && !p.image.startsWith('data:') && !p.image.startsWith('http')) {
+                                    imagePaths.add(p.image);
+                                }
+                            });
+                        });
+                    }
+                    
+                    if (imagePaths.size > 0) {
+                        const imgFolder = zip.folder('images');
+                        let successCount = 0;
+                        
+                        showNotification(`正在打包 ${imagePaths.size} 张图片...`, 'info');
+                        
+                        for (const path of imagePaths) {
+                            try {
+                                const file = await FileSystemManager.getFile(path);
+                                if (file) {
+                                    const filename = path.split('/').pop();
+                                    imgFolder.file(filename, file);
+                                    successCount++;
+                                }
+                            } catch (err) {
+                                console.warn('Failed to add image to zip:', path, err);
+                            }
+                        }
+                    }
+                } else {
+                     let hasLocalImages = false;
+                     if (data.presets) {
+                        Object.values(data.presets).forEach(list => {
+                            list.forEach(p => {
+                                if (p.image && !p.image.startsWith('data:') && !p.image.startsWith('http')) {
+                                    hasLocalImages = true;
+                                }
+                            });
+                        });
+                     }
+                     if (hasLocalImages) {
+                         showNotification('未连接文件夹，本地图片无法导出，仅导出元数据', 'warning');
+                     }
+                }
+                
+                const blob = await zip.generateAsync({type: "blob"});
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                const types = [];
+                if (exportConfig) types.push('config');
+                if (exportTags) types.push('tags');
+                if (exportPrompts) types.push('prompts');
+                
+                const typeStr = types.length === 3 ? 'full' : types.join('_');
+                
+                a.download = `mayi_prompt_backup_${typeStr}_${shouldEncrypt ? 'encrypted_' : ''}${new Date().toISOString().split('T')[0]}.zip`;
+                a.click();
+                URL.revokeObjectURL(url);
+                showNotification('数据导出成功 (ZIP格式)', 'success');
+                closeDataSelectionModal();
+            } catch (error) {
+                console.error('Export failed:', error);
+                showNotification('导出失败: ' + error.message, 'error');
+            }
         }
 
-        function importGlobalData(event) {
+        async function importGlobalData(event) {
             const file = event.target.files[0];
             if (!file) return;
             
-            const reader = new FileReader();
-            reader.onload = function(e) {
-                try {
-                    let content = e.target.result;
-                    let data;
+            try {
+                let content;
+                
+                if (file.name.endsWith('.zip')) {
+                    // Handle ZIP
+                    const zip = new JSZip();
+                    const loadedZip = await zip.loadAsync(file);
                     
-                    if (!content.trim().startsWith('{')) {
-                        try {
-                            const decoded = decodeURIComponent(escape(atob(content)));
-                            data = JSON.parse(decoded);
-                        } catch (err) {
-                             try {
-                                data = JSON.parse(content);
-                            } catch (parseErr) {
-                                throw new Error('无法解析文件，可能是格式错误或解密失败');
-                            }
-                        }
-                    } else {
-                        data = JSON.parse(content);
+                    if (!loadedZip.file('data.json')) {
+                        throw new Error('ZIP文件中未找到 data.json');
                     }
+                    content = await loadedZip.file('data.json').async('string');
                     
-                    const normalizedData = {};
+                    // Restore Images
+                    const imageFiles = [];
+                    loadedZip.folder("images").forEach((relativePath, file) => {
+                         imageFiles.push({ path: relativePath, file: file });
+                    });
                     
-                    if (data.systemSettings) {
-                        normalizedData.systemSettings = data.systemSettings;
-                    } else if (data.settings && data.settings.providers) {
-                        normalizedData.systemSettings = data.settings;
+                    if (imageFiles.length > 0) {
+                         if (!FileSystemManager.dirHandle) {
+                             if (confirm('检测到导入文件包含图片，建议连接本地文件夹以恢复图片。\n点击"确定"连接，点击"取消"仅导入数据(图片将无法显示)。')) {
+                                 await FileSystemManager.connect();
+                             }
+                         }
+                         
+                         if (FileSystemManager.dirHandle) {
+                             showNotification(`正在恢复 ${imageFiles.length} 张图片...`, 'info');
+                             let count = 0;
+                             for (const item of imageFiles) {
+                                 try {
+                                     const blob = await item.file.async('blob');
+                                     // item.path is the filename inside images/ folder
+                                     await FileSystemManager.writeFile(`images/${item.path}`, blob);
+                                     count++;
+                                 } catch (e) {
+                                     console.error('Failed to restore image:', item.path, e);
+                                 }
+                             }
+                             showNotification(`已恢复 ${count} 张图片`, 'success');
+                         }
                     }
-                    
-                    if (data.mainCategories) normalizedData.mainCategories = data.mainCategories;
-                    if (data.tags) normalizedData.tags = data.tags;
-                    if (data.groups) normalizedData.groups = data.groups;
-                    if (data.presetCategories) normalizedData.presetCategories = data.presetCategories;
-                    if (data.presets) normalizedData.presets = data.presets;
-                    
-                    if (data.uiSettings) {
-                        normalizedData.uiSettings = data.uiSettings;
-                    } else if (data.settings && !data.settings.providers) {
-                        normalizedData.uiSettings = data.settings;
-                    }
-
-                    pendingImportData = normalizedData;
-                    openDataSelectionModal('import', normalizedData);
-                    
-                } catch (error) {
-                    showNotification(error.message || '文件导入失败', 'error');
-                    console.error(error);
+                } else {
+                    // Handle JSON
+                    content = await new Promise((resolve, reject) => {
+                        const reader = new FileReader();
+                        reader.onload = e => resolve(e.target.result);
+                        reader.onerror = reject;
+                        reader.readAsText(file);
+                    });
                 }
-                event.target.value = '';
-            };
-            reader.readAsText(file);
+                
+                // Parse Data
+                let data;
+                if (!content.trim().startsWith('{')) {
+                    try {
+                        const decoded = decodeURIComponent(escape(atob(content)));
+                        data = JSON.parse(decoded);
+                    } catch (err) {
+                            try {
+                            data = JSON.parse(content);
+                        } catch (parseErr) {
+                            throw new Error('无法解析文件，可能是格式错误或解密失败');
+                        }
+                    }
+                } else {
+                    data = JSON.parse(content);
+                }
+                
+                const normalizedData = {};
+                
+                if (data.systemSettings) {
+                    normalizedData.systemSettings = data.systemSettings;
+                } else if (data.settings && data.settings.providers) {
+                    normalizedData.systemSettings = data.settings;
+                }
+                
+                if (data.mainCategories) normalizedData.mainCategories = data.mainCategories;
+                if (data.tags) normalizedData.tags = data.tags;
+                if (data.groups) normalizedData.groups = data.groups;
+                if (data.presetCategories) normalizedData.presetCategories = data.presetCategories;
+                if (data.presets) normalizedData.presets = data.presets;
+                
+                if (data.uiSettings) {
+                    normalizedData.uiSettings = data.uiSettings;
+                } else if (data.settings && !data.settings.providers) {
+                    normalizedData.uiSettings = data.settings;
+                }
+
+                pendingImportData = normalizedData;
+                openDataSelectionModal('import', normalizedData);
+                
+            } catch (error) {
+                showNotification(error.message || '文件导入失败', 'error');
+                console.error(error);
+            }
+            event.target.value = '';
         }
 
         function executeImport() {
@@ -974,16 +1391,51 @@ ${JSON.stringify(tags)}`;
             letter-spacing: 0.5px;
         }
         
+        .section-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 16px;
+            border-bottom: 1px solid #e2e8f0;
+        }
+
         .section-title {
             font-size: 18px !important;
-            font-weight: 600;
+            font-weight: 700;
             color: #1e293b;
-            margin-bottom: 16px;
-            padding-bottom: 8px;
-            border-bottom: 2px solid #e2e8f0;
+            margin-bottom: 0;
+            padding-bottom: 0;
+            border-bottom: none;
             display: flex;
             align-items: center;
+            gap: 10px;
+            letter-spacing: -0.025em;
+        }
+
+        .section-title i {
+            color: #4f46e5;
+            font-size: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 32px;
+            height: 32px;
+            background: #eef2ff;
+            border-radius: 8px;
+            transition: all 0.2s ease;
+        }
+
+        .section-header:hover .section-title i {
+            background: #4f46e5;
+            color: white;
+            transform: scale(1.05);
+        }
+
+        .section-actions {
+            display: flex;
             gap: 8px;
+            align-items: center;
         }
         
         .app-card {
@@ -1487,14 +1939,74 @@ ${JSON.stringify(tags)}`;
             visibility: visible;
         }
         
-        .preset-actions {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
+        .preset-image-wrapper {
+            position: relative;
             width: 100%;
-            min-width: 300px; /* 确保有足够的最小宽度 */
-            flex-wrap: wrap;
-            gap: 10px;
+            padding-top: 100%; /* 1:1 Aspect Ratio */
+            overflow: hidden;
+            border-radius: 8px;
+            margin-bottom: 12px;
+            background: #f3f4f6;
+        }
+        
+        .preset-image {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            transition: transform 0.3s ease;
+        }
+        
+        .preset-image-wrapper:hover .preset-image {
+            transform: scale(1.05);
+        }
+        
+        .preset-description-overlay {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: rgba(0, 0, 0, 0.6); /* 60% opacity */
+            color: white;
+            padding: 8px;
+            font-size: 12px;
+            transform: translateY(100%);
+            transition: transform 0.3s ease;
+            max-height: 100%;
+            overflow-y: auto;
+            backdrop-filter: blur(2px);
+        }
+        
+        .preset-image-wrapper:hover .preset-description-overlay {
+            transform: translateY(0);
+        }
+        
+        .magnifier-btn {
+            position: absolute;
+            top: 8px;
+            right: 8px;
+            width: 32px;
+            height: 32px;
+            background: rgba(255, 255, 255, 0.9);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #4f46e5;
+            opacity: 0;
+            transform: scale(0.8);
+            transition: all 0.3s ease;
+            cursor: pointer;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+            z-index: 10;
+        }
+        
+        .preset-image-wrapper:hover .magnifier-btn {
+            opacity: 1;
+            transform: scale(1);
+        }
         }
         
         /* 确保评分和按钮区域在桌面端正确布局 */
@@ -2023,6 +2535,7 @@ ${JSON.stringify(tags)}`;
             gap: 24px;
             margin-bottom: 24px;
             align-items: stretch;
+            flex-direction: row; /* 强制水平排列 */
         }
 
         .split-layout-container .app-card {
@@ -2031,13 +2544,17 @@ ${JSON.stringify(tags)}`;
             display: flex;
             flex-direction: column;
             transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-            width: 100%;
+            width: 0; /* 允许 flex item 缩小 */
+            min-width: 0; /* 防止内容撑开 */
         }
 
         /* 响应式：小屏幕垂直堆叠 */
         @media (max-width: 768px) {
             .split-layout-container {
                 flex-direction: column;
+            }
+            .split-layout-container .app-card {
+                width: 100%;
             }
         }
 
@@ -2053,6 +2570,29 @@ ${JSON.stringify(tags)}`;
             overflow: hidden;
             box-shadow: 0 2px 4px rgba(0,0,0,0.05);
             margin-bottom: 12px;
+        }
+
+        .preset-image-wrapper:hover .preset-description-overlay {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .preset-description-overlay {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: rgba(0, 0, 0, 0.75);
+            color: white;
+            padding: 8px 12px;
+            font-size: 12px;
+            opacity: 0;
+            transform: translateY(100%);
+            transition: all 0.3s ease;
+            z-index: 5;
+            max-height: 50%;
+            overflow-y: auto;
+            backdrop-filter: blur(2px);
         }
 
         .preset-image {
@@ -2505,7 +3045,12 @@ ${JSON.stringify(tags)}`;
             <div class="modal-content">
                 <div class="form-group">
                     <label for="newPresetName">Prompt名称</label>
-                    <input type="text" id="newPresetName" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500" placeholder="请输入Prompt名称">
+                    <div class="flex gap-2">
+                        <input type="text" id="newPresetName" class="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500" placeholder="请输入Prompt名称">
+                        <button type="button" class="btn btn-sm btn-info ai-generate-meta-btn" data-target="new" title="AI自动生成名称和描述">
+                            <i class="fas fa-magic"></i> AI生成
+                        </button>
+                    </div>
                 </div>
                 <div class="form-group">
                     <label for="newPresetDescription">Prompt描述</label>
@@ -2518,8 +3063,12 @@ ${JSON.stringify(tags)}`;
                     </select>
                 </div>
                 <div class="form-group">
-                    <label for="newPresetPrompt">Prompt内容</label>
-                    <textarea id="newPresetPrompt" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500" placeholder="请输入Prompt内容" rows="5"></textarea>
+                    <label for="newPresetPrompt">Prompt内容 (SD)</label>
+                    <textarea id="newPresetPrompt" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 font-mono text-sm" placeholder="请输入SD Prompt内容" rows="3"></textarea>
+                </div>
+                <div class="form-group">
+                    <label for="newPresetPromptXml">Prompt内容 (XML)</label>
+                    <textarea id="newPresetPromptXml" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 font-mono text-sm" placeholder="请输入XML Prompt内容" rows="3"></textarea>
                 </div>
                 <div class="form-group">
                     <label for="newPresetRating">评分</label>
@@ -2567,7 +3116,12 @@ ${JSON.stringify(tags)}`;
                 <input type="hidden" id="editPresetCategory">
                 <div class="form-group">
                     <label for="editPresetName">Prompt名称</label>
-                    <input type="text" id="editPresetName" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500" placeholder="请输入Prompt名称">
+                    <div class="flex gap-2">
+                        <input type="text" id="editPresetName" class="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500" placeholder="请输入Prompt名称">
+                        <button type="button" class="btn btn-sm btn-info ai-generate-meta-btn" data-target="edit" title="AI自动生成名称和描述">
+                            <i class="fas fa-magic"></i> AI生成
+                        </button>
+                    </div>
                 </div>
                 <div class="form-group">
                     <label for="editPresetDescription">Prompt描述</label>
@@ -2580,8 +3134,12 @@ ${JSON.stringify(tags)}`;
                     </select>
                 </div>
                 <div class="form-group">
-                    <label for="editPresetPrompt">Prompt内容</label>
-                    <textarea id="editPresetPrompt" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500" placeholder="请输入Prompt内容" rows="5"></textarea>
+                    <label for="editPresetPrompt">Prompt内容 (SD)</label>
+                    <textarea id="editPresetPrompt" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 font-mono text-sm" placeholder="请输入SD Prompt内容" rows="3"></textarea>
+                </div>
+                <div class="form-group">
+                    <label for="editPresetPromptXml">Prompt内容 (XML)</label>
+                    <textarea id="editPresetPromptXml" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 font-mono text-sm" placeholder="请输入XML Prompt内容" rows="3"></textarea>
                 </div>
                 <div class="form-group">
                     <label for="editPresetRating">评分</label>
@@ -3189,6 +3747,14 @@ ${JSON.stringify(tags)}`;
             console.log('Prompt搜索关键词:', window.currentPresetSearch);
             if (typeof renderPresets === 'function') renderPresets();
         }, 300);
+
+        // 自动解析防抖
+        let debouncedPasteAnalyze = debounce(function() {
+            if (typeof pasteAnalyze === 'function') {
+                // 传入 true 表示自动触发
+                pasteAnalyze(true);
+            }
+        }, 800);
         
         function initializeApp() {
             console.log('开始初始化应用...');
@@ -3561,6 +4127,174 @@ ${JSON.stringify(tags)}`;
             }
         }
 
+        // --- Missing Functions Implementation (Restored) ---
+
+        function toggleEditMode() {
+            if (typeof settings === 'undefined') return;
+            settings.editMode = !settings.editMode;
+            const btn = document.getElementById('editModeBtn');
+            if (btn) btn.classList.toggle('active', settings.editMode);
+            if (typeof renderTags === 'function') renderTags();
+        }
+
+        function clearAllTags() {
+            if(confirm('确定要清空所有已选标签吗？')) {
+                if (settings) settings.selectedTags = [];
+                if (typeof updateSelectedTagsDisplay === 'function') updateSelectedTagsDisplay();
+                if (typeof updatePrompt === 'function') updatePrompt();
+            }
+        }
+
+        function translateSelectedTags() {
+             if (typeof showNotification === 'function') showNotification('翻译功能暂未实现', 'info');
+        }
+
+        function copyPrompt() {
+            const promptText = document.getElementById('positivePrompt').value;
+            if (promptText) {
+                navigator.clipboard.writeText(promptText).then(() => {
+                    if (typeof showNotification === 'function') showNotification('提示词已复制', 'success');
+                }).catch(err => {
+                    console.error('复制失败:', err);
+                    if (typeof showNotification === 'function') showNotification('复制失败', 'error');
+                });
+            }
+        }
+
+        function downloadPrompt() {
+            const promptText = document.getElementById('positivePrompt').value;
+            if (!promptText) return;
+            const blob = new Blob([promptText], {type: 'text/plain'});
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'prompt.txt';
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+
+        function togglePlusMinus() {
+            if (settings) settings.showPlusMinus = !settings.showPlusMinus;
+            if (typeof saveData === 'function') saveData();
+            if (typeof renderTags === 'function') renderTags();
+        }
+
+        function toggleDelete() {
+            if (settings) settings.showDelete = !settings.showDelete;
+            if (typeof saveData === 'function') saveData();
+            if (typeof renderTags === 'function') renderTags();
+        }
+
+        function openMainCategoryManagementModal() {
+            const modal = document.getElementById('mainCategoryManagementModal');
+            if (modal) modal.classList.add('show');
+            // TODO: render list if needed
+        }
+
+        function addMainCategory() {
+             const name = prompt('请输入新分类名称:');
+             if(name && settings && settings.mainCategories) {
+                 const id = 'cat_' + Date.now();
+                 settings.mainCategories.push({id, name, isSystem: false});
+                 if (typeof saveData === 'function') saveData();
+                 if (typeof renderTagTabButtons === 'function') renderTagTabButtons();
+             }
+        }
+
+        function openPresetCategoryManagementModal() {
+             const modal = document.getElementById('presetCategoryManagementModal');
+             if (modal) modal.classList.add('show');
+             // TODO: render list if needed
+        }
+
+        function addPresetCategory() {
+             const name = prompt('请输入新Prompt分类名称:');
+             if(name && settings && settings.presetCategories) {
+                 const id = 'pcat_' + Date.now();
+                 settings.presetCategories.push({id, name, isSystem: false});
+                 if (typeof saveData === 'function') saveData();
+                 if (typeof renderPresetTabButtons === 'function') renderPresetTabButtons();
+             }
+        }
+
+        function confirmNewTag() {
+            const modal = document.getElementById('newTagModal');
+            if (modal) modal.classList.remove('show');
+        }
+
+        function confirmNewGroup() {
+            const modal = document.getElementById('newGroupModal');
+            if (modal) modal.classList.remove('show');
+        }
+
+        function confirmEditTag() {
+            const modal = document.getElementById('editTagModal');
+            if (modal) modal.classList.remove('show');
+        }
+
+        function exportAllData() {
+            if (typeof settings === 'undefined') return;
+            const data = {
+                settings: settings,
+                timestamp: Date.now()
+            };
+            const blob = new Blob([JSON.stringify(data, null, 2)], {type: 'application/json'});
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'prompt-ui-backup.json';
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+
+        function showImportOptions() {
+             const input = document.getElementById('importFile');
+             if (input) input.click();
+        }
+
+        function hideImportOptions() {
+             // Placeholder
+        }
+
+        function handleFileImport(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    if (typeof showNotification === 'function') showNotification('导入功能暂未完全实现', 'info');
+                } catch(err) {
+                    console.error(err);
+                }
+            };
+            reader.readAsText(file);
+        }
+
+        function resetAllData() {
+            if(confirm('确定要重置所有数据吗？')) {
+                localStorage.clear();
+                location.reload();
+            }
+        }
+
+        function showLocalStorageInfo() {
+            const modal = document.getElementById('localStorageInfoModal');
+            if(modal) modal.classList.add('show');
+        }
+        
+        function pasteAnalyze() {
+             if (typeof showNotification === 'function') showNotification('解析功能暂未实现', 'info');
+        }
+        
+        function confirmParseTag() {
+            const modal = document.getElementById('parseNewTagModal');
+            if (modal) modal.classList.remove('show');
+        }
+
+        function setupTagSearchSuggestions() {}
+        function setupPresetSearchSuggestions() {}
+        function setupPromptSuggestions() {}
+
         function initializeEventListeners() {
             console.log('正在初始化事件监听器...');
 
@@ -3728,6 +4462,30 @@ ${JSON.stringify(tags)}`;
             const pasteAnalyzeBtn = document.getElementById('pasteAnalyzeBtn');
             if (pasteAnalyzeBtn) {
                 pasteAnalyzeBtn.addEventListener('click', pasteAnalyze);
+            }
+
+            // 自动解析 Prompt 输入（监听 input 事件）
+            const promptInput = document.getElementById('positivePrompt');
+            if (promptInput) {
+                // 如果 debouncedPasteAnalyze 已定义则使用，否则重新定义
+                if (typeof debouncedPasteAnalyze !== 'function') {
+                    // 使用上面的 debounce 函数
+                     const d = debounce || ((f, w) => {
+                        let t;
+                        return (...args) => {
+                            clearTimeout(t);
+                            t = setTimeout(() => f(...args), w);
+                        };
+                    });
+                    
+                    window.debouncedPasteAnalyze = d(function() {
+                        if (typeof pasteAnalyze === 'function') {
+                            pasteAnalyze(true);
+                        }
+                    }, 800);
+                }
+                
+                promptInput.addEventListener('input', window.debouncedPasteAnalyze || debouncedPasteAnalyze);
             }
 
             // 解析新建标签模态框事件
@@ -5279,38 +6037,45 @@ ${JSON.stringify(tags)}`;
                     const ratingStars = '★'.repeat(preset.rating) + '☆'.repeat(10 - preset.rating);
                     html += `
                         <div class="preset-item bg-gradient-to-br from-white to-gray-50 p-4 rounded-xl border border-gray-200 hover:shadow-lg transition-shadow">
-                            <div class="flex justify-between items-start mb-2">
-                                <h4 class="font-semibold text-lg">${preset.name}</h4>
-                                <div class="flex gap-1">
+                            <div class="flex justify-between items-center mb-2">
+                                <h4 class="font-bold text-base truncate pr-2" title="${preset.name}">${preset.name}</h4>
+                                <div class="flex gap-1 flex-shrink-0">
                                     ${!settings.presetEditingMode ? `
-                                        <button class="btn btn-sm btn-primary apply-preset-btn" data-preset-id="${preset.id}" data-category="${category}">
-                                            <i class="fas fa-paper-plane"></i> 应用
+                                        <button class="btn btn-sm btn-primary apply-preset-btn p-1 px-2" data-preset-id="${preset.id}" data-category="${category}" title="应用">
+                                            <i class="fas fa-paper-plane"></i>
                                         </button>
                                     ` : ''}
-                                    <button class="btn btn-sm btn-info edit-preset-btn" data-preset-id="${preset.id}" data-category="${category}">
+                                    <button class="btn btn-sm btn-info edit-preset-btn p-1 px-2" data-preset-id="${preset.id}" data-category="${category}" title="编辑">
                                         <i class="fas fa-edit"></i>
                                     </button>
-                                    <button class="btn btn-sm btn-danger delete-preset-btn" data-preset-id="${preset.id}" data-category="${category}">
+                                    <button class="btn btn-sm btn-danger delete-preset-btn p-1 px-2" data-preset-id="${preset.id}" data-category="${category}" title="删除">
                                         <i class="fas fa-trash"></i>
                                     </button>
                                 </div>
                             </div>
-                            <p class="text-gray-600 text-sm mb-3">${preset.description}</p>
+                            
                             ${preset.image ? `
                                 <div class="preset-image-wrapper">
-                                    <img src="${preset.image}" alt="${preset.name}" class="preset-image">
+                                    <img src="${preset.image}" alt="${preset.name}" class="preset-image" loading="lazy">
+                                    ${preset.description ? `
+                                    <div class="preset-description-overlay">
+                                        ${preset.description}
+                                    </div>` : ''}
                                     <div class="magnifier-btn" data-image-src="${preset.image}">
                                         <i class="fas fa-search-plus"></i>
                                     </div>
                                 </div>
-                            ` : ''}
+                            ` : `
+                                <p class="text-gray-600 text-sm mb-3">${preset.description || ''}</p>
+                            `}
+                            
                             <div class="mb-3">
-                                <div class="bg-gray-800 text-green-400 p-3 rounded-lg font-mono text-sm overflow-auto h-[80px]">
+                                <div class="preset-prompt-content bg-gray-100 text-black p-2 rounded-lg font-mono text-sm overflow-auto h-[40px]">
                                     ${preset.prompt}
                                 </div>
                             </div>
                             <div class="flex justify-between items-center">
-                                <div class="rating">
+                                <div class="rating text-sm">
                                     ${ratingStars}
                                 </div>
                                 <div class="text-xs text-gray-500">
@@ -5345,7 +6110,7 @@ ${JSON.stringify(tags)}`;
                 });
                 
                 // 为提示词区域添加点击复制功能
-                document.querySelectorAll('.preset-item .bg-gray-800').forEach(promptArea => {
+                document.querySelectorAll('.preset-item .preset-prompt-content').forEach(promptArea => {
                     promptArea.addEventListener('click', function() {
                         const promptText = this.textContent.trim();
                         if (promptText) {
@@ -5707,15 +6472,19 @@ ${JSON.stringify(tags)}`;
 
         // 图片上传处理函数
         function setupImageUploadHandlers() {
+            // Remove existing listeners to avoid duplicates
+            // We'll use a property on the element to track if listener is added
+            
             // 为新建预设的图片上传设置事件处理
             const newImagePreview = document.getElementById('newPresetImagePreview');
             const newImageInput = document.getElementById('newPresetImage');
             const newImageData = document.getElementById('newPresetImageData');
             
-            if (newImagePreview && newImageInput) {
+            if (newImagePreview && newImageInput && !newImageInput._hasListener) {
                 newImagePreview.addEventListener('click', () => newImageInput.click());
                 newImageInput.addEventListener('change', (e) => handleImageUpload(e, newImagePreview, newImageData));
                 setupDragDrop(newImagePreview, newImageInput, newImageData);
+                newImageInput._hasListener = true;
             }
             
             // 为编辑预设的图片上传设置事件处理
@@ -5723,14 +6492,15 @@ ${JSON.stringify(tags)}`;
             const editImageInput = document.getElementById('editPresetImage');
             const editImageData = document.getElementById('editPresetImageData');
             
-            if (editImagePreview && editImageInput) {
+            if (editImagePreview && editImageInput && !editImageInput._hasListener) {
                 editImagePreview.addEventListener('click', () => editImageInput.click());
                 editImageInput.addEventListener('change', (e) => handleImageUpload(e, editImagePreview, editImageData));
                 setupDragDrop(editImagePreview, editImageInput, editImageData);
+                editImageInput._hasListener = true;
             }
         }
 
-        function handleImageUpload(event, previewElement, dataInput) {
+        async function handleImageUpload(event, previewElement, dataInput) {
             const file = event.target.files[0];
             if (!file) return;
             
@@ -5746,13 +6516,40 @@ ${JSON.stringify(tags)}`;
                 return;
             }
             
-            const reader = new FileReader();
-            reader.onload = function(e) {
-                previewElement.innerHTML = `<img src="${e.target.result}" alt="预览图片">`;
-                dataInput.value = e.target.result;
-                showNotification('图片上传成功', 'success');
-            };
-            reader.readAsDataURL(file);
+            try {
+                // 如果没有连接文件夹，强制要求连接
+                if (!FileSystemManager.dirHandle) {
+                     // 尝试恢复连接
+                     await FileSystemManager.init();
+                     
+                     // 再次检查
+                     if (!FileSystemManager.dirHandle) {
+                        if (confirm('为了避免浏览器存储限制，系统必须连接本地文件夹以保存图片。\n\n点击"确定"选择当前项目文件夹，图片将自动保存到 images 目录。')) {
+                            const success = await FileSystemManager.connect();
+                            if (!success) {
+                                event.target.value = ''; // 清空选择
+                                return;
+                            }
+                        } else {
+                            event.target.value = ''; // 清空选择
+                            showNotification('未连接文件夹，无法上传图片', 'error');
+                            return;
+                        }
+                     }
+                }
+                
+                // 此时一定已连接
+                const relativePath = await FileSystemManager.saveImage(file);
+                dataInput.value = relativePath;
+                const blobUrl = URL.createObjectURL(file);
+                previewElement.innerHTML = `<img src="${blobUrl}" alt="预览图片">`;
+                showNotification('图片已保存到本地文件夹', 'success');
+
+            } catch (error) {
+                console.error('Image upload failed:', error);
+                showNotification('图片处理失败: ' + error.message, 'error');
+                event.target.value = ''; // 清空选择
+            }
         }
 
         function setupDragDrop(previewElement, inputElement, dataInput) {
@@ -5953,18 +6750,27 @@ ${JSON.stringify(tags)}`;
         }
 
         // 修复问题1：添加解析粘贴功能
-        async function pasteAnalyze() {
+        async function pasteAnalyze(isAuto = false) {
+            // 兼容事件对象传入的情况
+            if (typeof isAuto !== 'boolean') isAuto = false;
+
             const promptElement = document.getElementById('positivePrompt');
             const parsedContainer = document.getElementById('parsedTagsContainer');
             
             if (!promptElement || !parsedContainer) {
-                showNotification('解析粘贴功能需要的元素不存在', 'error');
+                if (!isAuto) showNotification('解析粘贴功能需要的元素不存在', 'error');
                 return;
             }
 
             const prompt = promptElement.value.trim();
             if (!prompt) {
-                showNotification('请先在文本框中粘贴提示词', 'warning');
+                // 如果为空，清空解析结果
+                parsedContainer.innerHTML = '';
+                parsedContainer.style.display = 'none';
+                
+                if (!isAuto) {
+                    showNotification('请先在文本框中粘贴提示词', 'warning');
+                }
                 return;
             }
 
@@ -5988,6 +6794,21 @@ ${JSON.stringify(tags)}`;
                              t.translation = translations[t.text];
                          }
                      });
+                     
+                     // 同步翻译结果到已选择标签
+                     let selectionChanged = false;
+                     settings.selectedTags.forEach(selTag => {
+                         // 如果标签名称与内容相同（说明是未翻译状态）且有翻译结果
+                         if (selTag.name === selTag.text && translations[selTag.text]) {
+                             selTag.name = translations[selTag.text];
+                             selectionChanged = true;
+                         }
+                     });
+                     
+                     if (selectionChanged) {
+                         saveData();
+                         updateSelectedTagsDisplay();
+                     }
                 }
                 
                 displayParsedTags(tags);
@@ -6845,6 +7666,7 @@ ${JSON.stringify(tags)}`;
             document.getElementById('newPresetName').value = '';
             document.getElementById('newPresetDescription').value = '';
             document.getElementById('newPresetPrompt').value = '';
+            document.getElementById('newPresetPromptXml').value = '';
             document.getElementById('newPresetRating').value = '5';
             updateRatingStars('newPresetRatingStars', 5);
 
@@ -6856,6 +7678,7 @@ ${JSON.stringify(tags)}`;
             const description = document.getElementById('newPresetDescription').value.trim();
             const category = document.getElementById('newPresetCategory').value;
             const prompt = document.getElementById('newPresetPrompt').value.trim();
+            const promptXml = document.getElementById('newPresetPromptXml').value.trim();
             const rating = parseInt(document.getElementById('newPresetRating').value);
             const imageData = document.getElementById('newPresetImageData').value;
 
@@ -6869,6 +7692,7 @@ ${JSON.stringify(tags)}`;
                 name: name,
                 description: description,
                 prompt: prompt,
+                promptXml: promptXml,
                 category: category,
                 rating: rating,
                 favorite: false,
@@ -6890,6 +7714,7 @@ ${JSON.stringify(tags)}`;
             document.getElementById('newPresetName').value = '';
             document.getElementById('newPresetDescription').value = '';
             document.getElementById('newPresetPrompt').value = '';
+            document.getElementById('newPresetPromptXml').value = '';
             document.getElementById('newPresetRating').value = '5';
             document.getElementById('newPresetImageData').value = '';
             updateRatingStars('newPresetRatingStars', 5);
@@ -6905,6 +7730,7 @@ ${JSON.stringify(tags)}`;
             document.getElementById('editPresetName').value = preset.name;
             document.getElementById('editPresetDescription').value = preset.description;
             document.getElementById('editPresetPrompt').value = preset.prompt;
+            document.getElementById('editPresetPromptXml').value = preset.promptXml || '';
             document.getElementById('editPresetRating').value = preset.rating;
             updateRatingStars('editPresetRatingStars', preset.rating);
             
@@ -6938,6 +7764,7 @@ ${JSON.stringify(tags)}`;
             const description = document.getElementById('editPresetDescription').value.trim();
             const newCategory = document.getElementById('editPresetCategorySelect').value;
             const prompt = document.getElementById('editPresetPrompt').value.trim();
+            const promptXml = document.getElementById('editPresetPromptXml').value.trim();
             const rating = parseInt(document.getElementById('editPresetRating').value);
             const imageData = document.getElementById('editPresetImageData').value;
 
@@ -6967,6 +7794,7 @@ ${JSON.stringify(tags)}`;
                 preset.name = name;
                 preset.description = description;
                 preset.prompt = prompt;
+                preset.promptXml = promptXml;
                 preset.category = newCategory;
                 preset.rating = rating;
                 preset.image = imageData || null;
@@ -7022,6 +7850,120 @@ ${JSON.stringify(tags)}`;
             return colors[Math.floor(Math.random() * colors.length)];
         }
         
+        // --- Added for Metadata Generation ---
+        
+        // Handle AI Generate Metadata Buttons
+        function bindAiGenerateButtons() {
+             document.querySelectorAll('.ai-generate-meta-btn').forEach(btn => {
+                // Remove old listeners to avoid duplicates if called multiple times
+                const newBtn = btn.cloneNode(true);
+                btn.parentNode.replaceChild(newBtn, btn);
+                
+                newBtn.addEventListener('click', function() {
+                    const targetType = this.dataset.target; // 'new' or 'edit'
+                    handleAiGenerateMeta(targetType);
+                });
+            });
+        }
+
+        async function handleAiGenerateMeta(targetType) {
+            const promptId = targetType === 'new' ? 'newPresetPrompt' : 'editPresetPrompt';
+            const nameId = targetType === 'new' ? 'newPresetName' : 'editPresetName';
+            const descId = targetType === 'new' ? 'newPresetDescription' : 'editPresetDescription';
+            
+            const promptContent = document.getElementById(promptId).value.trim();
+            
+            if (!promptContent) {
+                showNotification('请先输入SD Prompt内容', 'warning');
+                return;
+            }
+            
+            // Show loading state
+            const btn = document.querySelector(`.ai-generate-meta-btn[data-target="${targetType}"]`);
+            const originalHtml = btn.innerHTML;
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 生成中...';
+            
+            try {
+                // Simulate API call delay
+                await new Promise(resolve => setTimeout(resolve, 1500));
+                
+                // Mock result - In real app, this would use settings.metaSystemPrompt to call AI
+                const mockName = "AI生成标题_" + Math.floor(Math.random() * 1000);
+                const mockDesc = "这是一个由AI根据提示词自动生成的描述。它分析了提示词中的风格、人物和场景元素。";
+                
+                // If we had a real API, we would use:
+                // const systemPrompt = settings.metaSystemPrompt || "Default system prompt...";
+                // const result = await callAiApi(systemPrompt, promptContent);
+                // const { name, description } = JSON.parse(result);
+                
+                document.getElementById(nameId).value = mockName;
+                document.getElementById(descId).value = mockDesc;
+                
+                showNotification('AI元数据生成成功 (模拟)', 'success');
+            } catch (error) {
+                console.error('AI Generation Error:', error);
+                showNotification('生成失败: ' + error.message, 'error');
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = originalHtml;
+            }
+        }
+        
+        // Initialize AI Settings and Bindings
+        document.addEventListener('DOMContentLoaded', () => {
+            // Ensure settings object has the field
+            if (typeof settings !== 'undefined' && !settings.metaSystemPrompt) {
+                settings.metaSystemPrompt = "你是一个专业的AI助手，请根据提供的Stable Diffusion提示词，生成一个简短的中文标题（name）和一段详细的中文描述（description）。请以JSON格式返回，包含name和description两个字段。";
+            }
+            
+            // Bind settings modal open event to populate the field
+            const openSettingsBtn = document.getElementById('openSettingsBtn');
+            if (openSettingsBtn) {
+                openSettingsBtn.addEventListener('click', () => {
+                    setTimeout(() => {
+                        const metaPromptInput = document.getElementById('settingMetaSystemPrompt');
+                        if (metaPromptInput && settings) {
+                            metaPromptInput.value = settings.metaSystemPrompt || '';
+                        }
+                    }, 100);
+                });
+            }
+            
+            // Bind save settings event
+            const saveSettingsBtn = document.getElementById('saveSettingsBtn');
+            if (saveSettingsBtn) {
+                saveSettingsBtn.addEventListener('click', () => {
+                    const metaPromptInput = document.getElementById('settingMetaSystemPrompt');
+                    if (metaPromptInput && settings) {
+                        settings.metaSystemPrompt = metaPromptInput.value;
+                        if (typeof saveData === 'function') {
+                            saveData();
+                        }
+                    }
+                });
+            }
+            
+            initSettings();
+            setupImageUploadHandlers();
+            setupRatingStarsHandlers();
+            
+            // Try to restore file system connection
+            FileSystemManager.init();
+        });
+        
+        // Override open modal functions to bind buttons
+        const originalOpenNewPresetModal = window.openNewPresetModal;
+        window.openNewPresetModal = function() {
+            if (originalOpenNewPresetModal) originalOpenNewPresetModal.apply(this, arguments);
+            setTimeout(bindAiGenerateButtons, 100);
+        };
+        
+        const originalOpenEditPresetModal = window.openEditPresetModal;
+        window.openEditPresetModal = function() {
+            if (originalOpenEditPresetModal) originalOpenEditPresetModal.apply(this, arguments);
+            setTimeout(bindAiGenerateButtons, 100);
+        };
 
     </script>
     <footer class="w-full mt-auto py-6 border-t border-slate-200 bg-white/80 backdrop-blur-sm">
@@ -7201,6 +8143,20 @@ ${JSON.stringify(tags)}`;
                             </div>
                         </div>
                         
+                        <!-- 提示词元数据生成配置卡片 (新) -->
+                        <div class="bg-white border border-gray-200 rounded-xl p-5 shadow-sm mb-6">
+                            <h5 class="font-bold text-gray-800 mb-3 flex items-center gap-2">
+                                <i class="fas fa-file-alt text-blue-500"></i> 元数据生成配置 (名称/描述)
+                            </h5>
+                            <p class="text-sm text-gray-500 mb-4">配置"AI生成"按钮的参数。此功能用于根据SD提示词自动生成简洁的中文名称和详细描述。</p>
+                            
+                            <div class="md:col-span-2">
+                                <label class="block text-sm font-medium text-gray-700 mb-1">System Prompt (元数据生成)</label>
+                                <textarea id="settingMetaSystemPrompt" class="w-full px-3 py-2 border border-gray-300 rounded-md h-24 text-sm font-mono" placeholder="你是一个专业的AI助手..."></textarea>
+                                <p class="text-xs text-gray-500 mt-1">定义AI如何根据SD提示词生成名称和描述。请要求AI返回JSON格式。</p>
+                            </div>
+                        </div>
+
                         <!-- 预留其他AI功能位置 -->
                         <div class="bg-gray-50 border border-gray-200 rounded-xl p-5 border-dashed flex items-center justify-center text-gray-400">
                             <span>更多AI功能（如图片反推、标签翻译）敬请期待...</span>
@@ -7211,13 +8167,22 @@ ${JSON.stringify(tags)}`;
                     <div id="tab-data" class="settings-tab-content hidden">
                         <h4 class="text-lg font-semibold text-gray-800 mb-4 pb-2 border-b">数据交换与安全</h4>
                         <div class="space-y-4">
+                            <!-- Local Storage Mode -->
+                            <div class="bg-green-50 p-4 rounded-lg border border-green-100">
+                                <h5 class="font-semibold text-green-800 mb-2">本地存储模式 (推荐)</h5>
+                                <p id="connectFolderDesc" class="text-sm text-green-600 mb-3">连接本地文件夹以启用图片存储和完整导入导出功能。图片将直接保存在您的磁盘上，不受浏览器容量限制。</p>
+                                <button id="connectFolderBtn" class="btn btn-secondary w-full">
+                                    <i class="fas fa-folder"></i> 连接项目文件夹
+                                </button>
+                            </div>
+
                             <div class="bg-blue-50 p-4 rounded-lg border border-blue-100">
                                 <h5 class="font-semibold text-blue-800 mb-2">数据备份</h5>
                                 <p class="text-sm text-blue-600 mb-3">导出所有配置和自定义数据（含API密钥，请妥善保管）</p>
                                 <div class="flex gap-3">
                                     <button id="exportDataBtn" class="btn btn-primary"><i class="fas fa-file-export"></i> 导出JSON</button>
                                     <button id="importDataBtn" class="btn btn-info"><i class="fas fa-file-import"></i> 导入JSON</button>
-                                    <input type="file" id="importDataInput" class="hidden" accept=".json">
+                                    <input type="file" id="importDataInput" class="hidden" accept=".json,.zip">
                                 </div>
                             </div>
                             
