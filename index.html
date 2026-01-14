@@ -3283,6 +3283,25 @@ ${JSON.stringify(tags)}`;
     
 
     
+    <!-- 重命名分类模态框 -->
+    <div id="renameCategoryModal" class="modal-overlay">
+        <div class="modal">
+            <div class="modal-title">
+                <i class="fas fa-edit mr-2"></i> 编辑分类名称
+            </div>
+            <div class="modal-content">
+                <div class="form-group">
+                    <label for="renameCategoryInput">分类名称</label>
+                    <input type="text" id="renameCategoryInput" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500" placeholder="请输入新的分类名称">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button id="cancelRenameCategoryBtn" class="btn btn-secondary">取消</button>
+                <button id="confirmRenameCategoryBtn" class="btn btn-primary">保存</button>
+            </div>
+        </div>
+    </div>
+
     <!-- 通知组件 -->
     <div id="notification" class="notification"></div>
 
@@ -4872,6 +4891,14 @@ ${JSON.stringify(tags)}`;
                     switchTagTab(category.id);
                 });
 
+                // 双击编辑分类名称
+                button.addEventListener('dblclick', function(e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    const index = settings.mainCategories.findIndex(c => c.id === category.id);
+                    if (index !== -1) editMainCategory(index);
+                });
+
                 container.appendChild(button);
             });
 
@@ -4893,7 +4920,7 @@ ${JSON.stringify(tags)}`;
                 return;
             }
 
-            settings.presetCategories.forEach(category => {
+            settings.presetCategories.forEach((category, index) => {
                 const presetCount = settings.presets[category.id] ? settings.presets[category.id].length : 0;
                 const button = document.createElement('button');
                 button.className = `tab-button ${settings.currentPresetTab === category.id ? 'active' : ''}`;
@@ -4902,6 +4929,13 @@ ${JSON.stringify(tags)}`;
 
                 button.addEventListener('click', function() {
                     switchPresetTab(category.id);
+                });
+
+                // 双击编辑分类名称
+                button.addEventListener('dblclick', function(e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    editPresetCategory(index);
                 });
 
                 container.appendChild(button);
@@ -6142,7 +6176,7 @@ ${JSON.stringify(tags)}`;
                             `}
                             
                             <div class="mb-3">
-                                <div class="preset-prompt-content bg-gray-100 text-black p-2 rounded-lg font-mono text-sm overflow-auto h-[40px]">
+                                <div class="preset-prompt-content bg-gray-100 text-black p-2 rounded-lg font-mono text-sm overflow-auto h-[80px]">
                                     ${preset.prompt}
                                 </div>
                             </div>
@@ -7590,18 +7624,70 @@ ${JSON.stringify(tags)}`;
             showNotification(`已添加新分类: ${name}`, 'success');
         }
 
+        // --- 重命名模态框逻辑 ---
+        let renameCategoryCallback = null;
+
+        function openRenameCategoryModal(currentName, callback) {
+            const modal = document.getElementById('renameCategoryModal');
+            const input = document.getElementById('renameCategoryInput');
+            if (!modal || !input) return;
+
+            input.value = currentName;
+            renameCategoryCallback = callback;
+            modal.classList.add('show');
+            // 聚焦并全选
+            setTimeout(() => {
+                input.focus();
+                input.select();
+            }, 100);
+        }
+
+        function closeRenameCategoryModal() {
+            const modal = document.getElementById('renameCategoryModal');
+            if (modal) modal.classList.remove('show');
+            renameCategoryCallback = null;
+        }
+
+        // 初始化重命名模态框事件
+        (function initRenameModal() {
+            const cancelBtn = document.getElementById('cancelRenameCategoryBtn');
+            const confirmBtn = document.getElementById('confirmRenameCategoryBtn');
+            const input = document.getElementById('renameCategoryInput');
+
+            if (cancelBtn) cancelBtn.addEventListener('click', closeRenameCategoryModal);
+            
+            if (confirmBtn) {
+                confirmBtn.addEventListener('click', () => {
+                    const val = input.value.trim();
+                    if (val) {
+                        if (renameCategoryCallback) renameCategoryCallback(val);
+                        closeRenameCategoryModal();
+                    } else {
+                        showNotification('分类名称不能为空', 'error');
+                    }
+                });
+            }
+
+            if (input) {
+                input.addEventListener('keyup', (e) => {
+                    if (e.key === 'Enter') {
+                        confirmBtn.click();
+                    }
+                });
+            }
+        })();
+
         function editMainCategory(index) {
             const category = settings.mainCategories[index];
             if (!category) return;
 
-            const newName = prompt('请输入新的分类名称:', category.name);
-            if (newName && newName.trim()) {
-                category.name = newName.trim();
+            openRenameCategoryModal(category.name, (newName) => {
+                category.name = newName;
                 saveData();
                 renderMainCategoryList();
                 renderTagTabButtons();
                 showNotification('分类名称已更新', 'success');
-            }
+            });
         }
 
         function deleteMainCategory(index) {
@@ -7696,36 +7782,41 @@ ${JSON.stringify(tags)}`;
                     </div>
                 `;
 
+                // 绑定事件
+                const editBtn = item.querySelector('.edit-preset-category-btn');
+                if (editBtn) {
+                    editBtn.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        console.log('点击编辑分类按钮:', index);
+                        editPresetCategory(index);
+                    });
+                }
+
+                const deleteBtn = item.querySelector('.delete-preset-category-btn');
+                if (deleteBtn) {
+                    deleteBtn.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        deletePresetCategory(index);
+                    });
+                }
+
+                const moveUpBtn = item.querySelector('.move-up-btn');
+                if (moveUpBtn) {
+                    moveUpBtn.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        movePresetCategory(index, -1);
+                    });
+                }
+
+                const moveDownBtn = item.querySelector('.move-down-btn');
+                if (moveDownBtn) {
+                    moveDownBtn.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        movePresetCategory(index, 1);
+                    });
+                }
+
                 container.appendChild(item);
-            });
-
-            // 绑定事件
-            document.querySelectorAll('.edit-preset-category-btn').forEach(btn => {
-                btn.addEventListener('click', function() {
-                    const index = parseInt(this.dataset.index);
-                    editPresetCategory(index);
-                });
-            });
-
-            document.querySelectorAll('.delete-preset-category-btn').forEach(btn => {
-                btn.addEventListener('click', function() {
-                    const index = parseInt(this.dataset.index);
-                    deletePresetCategory(index);
-                });
-            });
-
-            document.querySelectorAll('.move-up-btn').forEach(btn => {
-                btn.addEventListener('click', function() {
-                    const index = parseInt(this.dataset.index);
-                    movePresetCategory(index, -1);
-                });
-            });
-
-            document.querySelectorAll('.move-down-btn').forEach(btn => {
-                btn.addEventListener('click', function() {
-                    const index = parseInt(this.dataset.index);
-                    movePresetCategory(index, 1);
-                });
             });
         }
 
@@ -7761,14 +7852,13 @@ ${JSON.stringify(tags)}`;
             const category = settings.presetCategories[index];
             if (!category) return;
 
-            const newName = prompt('请输入新的分类名称:', category.name);
-            if (newName && newName.trim()) {
-                category.name = newName.trim();
+            openRenameCategoryModal(category.name, (newName) => {
+                category.name = newName;
                 saveData();
                 renderPresetCategoryList();
                 renderPresetTabButtons();
                 showNotification('分类名称已更新', 'success');
-            }
+            });
         }
 
         function deletePresetCategory(index) {
